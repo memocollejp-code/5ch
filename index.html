@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <meta name="theme-color" content="#0E7C66">
-<title>5ch ブラウザ v4.9.0</title>
+<title>5ch ブラウザ v4.9.1</title>
 <!-- PWA -->
 <link rel="manifest" href="./manifest.json">
 <link rel="icon" type="image/png" sizes="512x512" href="./icon-512.png">
@@ -692,7 +692,7 @@
     </div>
   </div>
   <div class="drawer-note" id="drawerNoteText">
-    5ch ブラウザ v4.9.0
+    5ch ブラウザ v4.9.1
   </div>
 </div>
 
@@ -709,7 +709,7 @@
 </div>
 
 <script>
-const VERSION = '4.9.0';
+const VERSION = '4.9.1';
 const APP_ID = '5ch-viewer';
 const LS_KEY = APP_ID + '-persist';
 
@@ -923,6 +923,13 @@ function applyCustomBoards(){
     if(BOARDS.some(b=>b.id===cb.id)) return; /* デフォルト板との衝突は既にaddCustomBoard側で弾いているが念のため二重防御 */
     BOARDS.push({ id:cb.id, name:cb.name||cb.id, color:cb.color||'#8A93A1', cat:'カスタム板', custom:true });
     OPEN2CH_BOARDS[cb.id] = { server:cb.server, key:cb.key };
+    /* v4.9.1バグ修正: デフォルト4板(app/netgame/occult/lovat)追加時と同じ理由で、
+       THREADS[cb.id]が未定義のままだとnormalizeState()の
+       「THREADS[boardId]が無ければホームへ強制送還」ガードに引っかかり、
+       追加直後の板をスレ一覧表示中にアプリを再起動すると板が消えたように
+       見えてしまう。空配列を用意しておけば実データはensureLiveThreadsが
+       後から自然に上書きする。 */
+    if(!THREADS[cb.id]) THREADS[cb.id] = [];
   });
 }
 /* v4.5.0: カスタム板の内部ID（BOARDS/OPEN2CH_BOARDSのキー）を生成する。
@@ -1058,12 +1065,22 @@ async function proxyFetchText(url){
      open2ch/5chのsubject.txt・.datが届く前に不可逆に破壊されていた。
      /raw エンドポイントで生バイナリを受け取り、ブラウザ純正の
      TextDecoder('shift_jis')で復元することで文字化けを根絶する。 */
+  /* v4.9.1バグ修正: 無料の公開CORSプロキシ(allorigins)は混雑時に
+     数十秒〜応答が返らないことがあり、タイムアウトが無いと画面が
+     「読み込み中...」のままフリーズしたように見えてしまっていた。
+     AbortControllerで20秒の上限を設け、超過時ははっきり
+     「時間がかかりすぎている」旨のエラーとして扱う。 */
   const proxied = CORS_PROXY + encodeURIComponent(url);
+  const controller = new AbortController();
+  const timeoutId = setTimeout(()=>controller.abort(), 20000);
   let res;
   try{
-    res = await fetch(proxied);
+    res = await fetch(proxied, { signal: controller.signal });
   }catch(e){
+    if(e && e.name === 'AbortError') throw new Error('通信がタイムアウトしました（プロキシが混雑している可能性があります。しばらくして再度お試しください）');
     throw new Error('プロキシ経由の取得に失敗しました: ネットワークエラー');
+  }finally{
+    clearTimeout(timeoutId);
   }
   if(!res.ok) throw new Error('プロキシ経由の取得に失敗しました: HTTP ' + res.status);
   let buffer;
