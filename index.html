@@ -1,0 +1,3404 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="theme-color" content="#0E7C66">
+<title>5ch ブラウザ v4.8.0</title>
+<!-- PWA -->
+<link rel="manifest" href="./manifest.json">
+<link rel="icon" type="image/png" sizes="512x512" href="./icon-512.png">
+<link rel="apple-touch-icon" href="./icon-192.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="5chブラウザ">
+<style>
+  :root{
+    --bg:#E9EDF2; --surface:#FFFFFF; --surface-2:#F4F6F9; --line:#DCE2EA;
+    --text:#15181C; --text-2:#5A626D; --meta:#8A93A1;
+    --name:#12813A; --anchor:#1364C4; --accent:#0E7C66; --accent-2:#0B6153;
+    --ink:#FFFFFF; --star:#F2A93B; --new:#E24A4A; --own:#FFF7E8; --own-line:#F2D28A;
+    --shadow:0 8px 30px rgba(18,28,38,.22); --shadow-sm:0 2px 8px rgba(18,28,38,.12);
+    --fab-bg:rgba(11,97,83,.82); --fab-ink:#FFFFFF; --fab-border:rgba(255,255,255,.22);
+    --mono:ui-monospace,SFMono-Regular,"SF Mono",Menlo,Consolas,monospace;
+    --sans:system-ui,-apple-system,"Hiragino Kaku Gothic ProN","Noto Sans JP","Yu Gothic",sans-serif;
+    --hdr-h:52px;
+    /* v2.6.0: IDの発言回数に応じた色分け（Chmate風） */
+    --pid-warn:#B5590A; --pid-hot:#D6271E;
+  }
+  html[data-theme="dark"]{
+    --bg:#0F1317; --surface:#1A1F26; --surface-2:#20262E; --line:#2B323B;
+    --text:#E7EAEE; --text-2:#9AA3AF; --meta:#727B87;
+    --name:#4FCB7C; --anchor:#5B9BF2; --accent:#12967A; --accent-2:#0B6153;
+    --ink:#FFFFFF; --star:#F2B84B; --new:#F2645A; --own:#232A1E; --own-line:#4A5A32;
+    --shadow:0 8px 30px rgba(0,0,0,.55); --shadow-sm:0 2px 8px rgba(0,0,0,.4);
+    --fab-bg:rgba(26,34,42,.78); --fab-ink:#E7EAEE; --fab-border:rgba(255,255,255,.14);
+    /* v2.6.0: ダークモードでも視認性の高い色に調整 */
+    --pid-warn:#FFA645; --pid-hot:#FF5C52;
+  }
+  *{box-sizing:border-box; -webkit-tap-highlight-color:transparent;}
+  html,body{margin:0; height:100%;}
+  body{
+    font-family:var(--sans); color:var(--text); background:var(--bg);
+    font-size:15px; line-height:1.55; overscroll-behavior-y:none;
+    -webkit-text-size-adjust:100%;
+  }
+  #app{display:flex; flex-direction:column; height:100dvh; max-width:640px; margin:0 auto; background:var(--surface); position:relative;}
+
+  /* ---- Header ---- */
+  #hdr{
+    height:var(--hdr-h); flex:0 0 auto; display:flex; align-items:center;
+    background:linear-gradient(180deg,var(--accent),var(--accent-2)); color:var(--ink);
+    padding:0 4px; padding-top:env(safe-area-inset-top); box-shadow:var(--shadow-sm); z-index:30;
+  }
+  .hbtn{
+    width:46px; height:46px; flex:0 0 auto; display:flex; align-items:center; justify-content:center;
+    background:transparent; border:0; color:var(--ink); font-size:22px; cursor:pointer; border-radius:12px;
+  }
+  .hbtn:active{background:rgba(255,255,255,.18);}
+  #backBtn.hide{visibility:hidden;}
+  /* v2.6.0: スレメニュー（縦三点）ボタン - res画面以外では非表示にしてレイアウトも詰める */
+  #threadMenuBtn.hide{display:none;}
+  #hdrTitle{
+    flex:1 1 auto; min-width:0; font-weight:700; font-size:16px; letter-spacing:.2px;
+    white-space:nowrap; overflow:hidden; text-overflow:ellipsis; padding:0 4px;
+  }
+  #hdrTitle .ver{font-weight:600; font-size:12px; opacity:.85; margin-left:6px; font-family:var(--mono);}
+
+  /* ---- Main scroll area ---- */
+  #main{flex:1 1 auto; overflow-y:auto; -webkit-overflow-scrolling:touch; background:var(--bg);}
+  #main.has-compose{padding-bottom:72px;}
+  @media (prefers-reduced-motion:reduce){
+    *{animation:none !important;}
+    #drawer{transition:none;}
+    #toast{transition:opacity .1s;}
+  }
+
+  /* ---- Home (boards) ---- */
+  .home-hero{
+    background:linear-gradient(180deg,var(--accent-2),var(--accent)); color:var(--ink);
+    padding:18px 18px 22px;
+  }
+  .home-hero h1{margin:0; font-size:26px; font-weight:800; letter-spacing:.5px; display:flex; align-items:baseline; gap:10px; flex-wrap:wrap;}
+  .home-hero h1 .ver{font-family:var(--mono); font-size:14px; font-weight:600; background:rgba(255,255,255,.16); padding:2px 8px; border-radius:999px;}
+  .home-hero p{margin:6px 0 0; font-size:12.5px; opacity:.9;}
+
+  .section-label{
+    font-family:var(--mono); font-size:11px; letter-spacing:1.5px; text-transform:uppercase;
+    color:var(--text-2); padding:16px 16px 6px; display:flex; align-items:center; gap:8px;
+  }
+  .section-label::after{content:""; flex:1; height:1px; background:var(--line);}
+
+  .card-group{background:var(--surface); border-top:1px solid var(--line); border-bottom:1px solid var(--line);}
+  .board-row{
+    display:flex; align-items:center; gap:12px; min-height:52px; padding:10px 16px;
+    border-bottom:1px solid var(--line); background:var(--surface); cursor:pointer;
+  }
+  .board-row:last-child{border-bottom:0;}
+  .board-row:active{background:var(--surface-2);}
+  .board-ico{
+    width:30px; height:30px; flex:0 0 auto; border-radius:9px; display:flex; align-items:center; justify-content:center;
+    font-family:var(--mono); font-weight:700; font-size:13px; color:var(--ink);
+  }
+  .board-name{flex:1 1 auto; min-width:0; font-weight:600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;}
+  .board-count{font-family:var(--mono); font-size:11.5px; color:var(--meta);}
+  .chev{color:var(--meta); font-size:18px; flex:0 0 auto;}
+  /* ---- v2.4.0: 板のお気に入り登録ボタン ---- */
+  .board-fav-star{
+    width:34px; height:34px; flex:0 0 auto; display:flex; align-items:center; justify-content:center;
+    font-size:18px; color:#C6CCD4; background:transparent; border:0; cursor:pointer; border-radius:10px;
+  }
+  .board-fav-star.on{color:var(--star);}
+  .board-fav-star:active{background:var(--surface-2);}
+  /* v4.4.0: カスタム板行の削除（ゴミ箱）ボタン */
+  .board-trash-btn{
+    width:34px; height:34px; flex:0 0 auto; display:flex; align-items:center; justify-content:center;
+    font-size:16px; color:var(--meta); background:transparent; border:0; cursor:pointer; border-radius:10px;
+  }
+  .board-trash-btn:active{background:rgba(226,74,74,.14); color:var(--new);}
+
+  /* ---- Favorites on home ---- */
+  .fav-row{
+    display:flex; align-items:center; gap:10px; padding:10px 16px; min-height:48px;
+    border-bottom:1px solid var(--line); background:var(--surface); cursor:pointer;
+  }
+  .fav-row:active{background:var(--surface-2);}
+  .fav-row .star{color:var(--star); font-size:16px; flex:0 0 auto;}
+  .fav-row .history-ico{color:var(--meta); font-size:14px; flex:0 0 auto;}
+  .fav-row .ft{flex:1 1 auto; min-width:0; font-size:14px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;}
+  .fav-row .fb{font-family:var(--mono); font-size:11px; color:var(--meta);}
+  .fav-row .fb.pill{padding:2px 7px;}
+
+  /* ---- v2.1.0: お気に入り一括新着チェック ---- */
+  .fav-check-btn{
+    font-family:var(--mono); font-size:11px; font-weight:700; color:var(--accent);
+    background:var(--surface-2); border:1px solid var(--line); border-radius:999px;
+    padding:3px 9px; cursor:pointer; white-space:nowrap; flex:0 0 auto;
+    display:inline-flex; align-items:center; gap:3px;
+  }
+  .fav-check-btn:active{background:var(--surface);}
+  html[data-theme="dark"] .fav-check-btn{background:var(--surface);}
+
+  /* ---- Thread list ---- */
+  .thread-row{
+    display:grid; grid-template-columns:1fr auto; grid-template-rows:auto auto;
+    gap:2px 10px; padding:11px 14px 11px 16px; border-bottom:1px solid var(--line);
+    background:var(--surface); cursor:pointer; align-items:start;
+  }
+  .thread-row:active{background:var(--surface-2);}
+  .thread-row .ttl{
+    grid-column:1; grid-row:1; font-size:14.5px; line-height:1.45; color:var(--text);
+    display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden;
+  }
+  .thread-row.unread .ttl{font-weight:700;}
+  .thread-row.read .ttl{color:var(--text-2);}
+  .thread-row .fav-star{
+    grid-column:2; grid-row:1 / span 2; align-self:center; width:38px; height:38px;
+    display:flex; align-items:center; justify-content:center; font-size:19px; color:#C6CCD4;
+    background:transparent; border:0; cursor:pointer; border-radius:10px; flex:0 0 auto;
+  }
+  .thread-row .fav-star.on{color:var(--star);}
+  .thread-row .fav-star:active{background:var(--surface-2);}
+  .thread-row .meta{grid-column:1; grid-row:2; display:flex; align-items:center; gap:8px; flex-wrap:wrap;}
+  .pill{font-family:var(--mono); font-size:11px; padding:1px 6px; border-radius:999px; line-height:1.5;}
+  .pill.res{background:var(--surface-2); color:var(--text-2); border:1px solid var(--line);}
+  .pill.mom{background:transparent; color:var(--meta);}
+  .pill.mom b{color:var(--accent);}
+  .dot-new{width:8px; height:8px; border-radius:50%; background:var(--new); display:inline-block; flex:0 0 auto;}
+  .pill.new{background:rgba(226,74,74,.12); color:var(--new); font-weight:700; border:1px solid rgba(226,74,74,.3);}
+  .pill.done{color:var(--meta);}
+  /* v3.6.0: 1000レス終了（DAT落ち）済みスレを一覧上で一目でわかるようにグレーアウトする */
+  .thread-row.datochi-row, .fav-row.datochi-row{opacity:.6;}
+  .pill.dat{background:var(--surface-2); color:var(--meta); border:1px solid var(--line);}
+
+  .list-toolbar{
+    position:sticky; top:0; z-index:5; display:flex; align-items:center; justify-content:space-between;
+    padding:8px 14px; background:var(--surface-2); border-bottom:1px solid var(--line);
+    font-size:12px; color:var(--text-2);
+  }
+  .list-toolbar .cnt{font-family:var(--mono);}
+  .list-toolbar .toolbar-right{display:flex; align-items:center; gap:8px; flex:0 0 auto;}
+
+  /* ---- Thread sort button ---- */
+  .sort-btn{
+    font-family:var(--mono); font-size:11px; font-weight:700; color:var(--text-2);
+    background:var(--surface); border:1px solid var(--line); border-radius:999px;
+    padding:4px 10px; cursor:pointer; white-space:nowrap; display:inline-flex; align-items:center; gap:3px;
+  }
+  .sort-btn:active{background:var(--surface-2);}
+  html[data-theme="dark"] .sort-btn{background:var(--surface-2);}
+
+  /* ---- Thread search (filter) ---- */
+  .search-bar{
+    background:var(--surface); border-bottom:1px solid var(--line);
+    padding:8px 14px; display:flex; align-items:center; gap:6px;
+  }
+  .search-input{
+    flex:1 1 auto; min-width:0; font-family:var(--sans); font-size:14px; color:var(--text);
+    border:1px solid var(--line); border-radius:10px; padding:9px 12px;
+    background:var(--surface-2); -webkit-appearance:none; appearance:none;
+  }
+  .search-input::placeholder{color:var(--meta);}
+  .search-input:focus{outline:2px solid var(--accent); background:var(--surface);}
+  .search-input::-webkit-search-cancel-button{-webkit-appearance:none; appearance:none;}
+  /* v3.8.0: 検索キーワードクリアボタン。キーワード空のときは非表示で操作感を損なわないようにする。 */
+  .search-clear-btn{
+    flex:0 0 32px; height:32px; display:none; align-items:center; justify-content:center;
+    font-weight:700; font-size:16px; color:var(--text-2); background:transparent;
+    border:1px solid var(--line); border-radius:8px; cursor:pointer; padding:0; margin:0;
+    -webkit-appearance:none; appearance:none;
+  }
+  .search-clear-btn.show{display:flex;}
+  .search-clear-btn:active{background:var(--surface-2); color:var(--text);}
+
+  /* ---- Res (posts) ---- */
+  .post{padding:12px 14px; border-bottom:1px solid var(--line); background:var(--surface);}
+  .post.own{background:var(--own); border-left:3px solid var(--own-line);}
+  /* v4.1.0: 「【主】のみ」表示中、スレ主以外のレスをCSSで非表示にする。
+     DOM要素自体は削除しないため、jumpToPost()から解除して安全にジャンプできる。 */
+  .post.nushi-hidden{display:none;}
+  .post-head{display:flex; align-items:baseline; gap:8px; flex-wrap:wrap; margin-bottom:5px;}
+  .pnum{font-family:var(--mono); font-weight:700; font-size:13px; color:var(--accent); flex:0 0 auto;}
+  .pname{color:var(--name); font-weight:700; font-size:13.5px; word-break:break-all;}
+  .pmeta{font-family:var(--mono); font-size:11px; color:var(--meta); word-break:break-all;}
+  .pid{cursor:pointer; text-decoration:underline dotted; text-underline-offset:2px; border-radius:3px; padding:1px 1px;}
+  .pid:active{background:rgba(19,100,196,.14);}
+  /* v2.6.0: 発言回数に応じたID色分け（Chmate風の赤字機能） 3〜4回 */
+  .pid.pid-warn{color:var(--pid-warn); font-weight:700;}
+  /* 5回以上: 激しく書き込んでいるIDを一目でわかる赤色・太字で強調 */
+  .pid.pid-hot{color:var(--pid-hot); font-weight:800;}
+  .id-count{font-family:var(--mono); font-size:11px; color:var(--anchor); font-weight:700; margin-left:2px;}
+  .pid-warn + .id-count{color:var(--pid-warn);}
+  .pid-hot + .id-count{color:var(--pid-hot); font-weight:800;}
+  .badge-me{font-family:var(--mono); font-size:10px; background:var(--star); color:#3a2a00; padding:1px 5px; border-radius:4px; font-weight:700;}
+  /* v2.8.0: スレ主（>>1と同一ID）に付与する【主】バッジ - ライト/ダーク双方で視認性の高い配色 */
+  .badge-nushi{font-family:var(--mono); font-size:10px; font-weight:800; background:var(--star); color:#3a2200; padding:1px 6px; border-radius:4px; margin-left:2px; letter-spacing:.2px;}
+  .post-body{font-size:15px; line-height:1.7; white-space:pre-wrap; word-break:break-word;}
+  .post.ng .post-head{opacity:.5;}
+  .post-body.ng-body{padding:2px 0;}
+  .ng-label{
+    display:inline-block; font-family:var(--mono); font-size:12.5px; color:var(--meta);
+    background:var(--surface-2); border:1px dashed var(--line); padding:4px 10px; border-radius:8px;
+  }
+  .anchor{color:var(--anchor); font-weight:600; text-decoration:none; cursor:pointer; padding:1px 1px; border-radius:3px;}
+  .anchor:active{background:rgba(19,100,196,.14);}
+  .reply-badge{
+    margin-top:7px; display:inline-flex; align-items:center; gap:4px; font-family:var(--mono);
+    font-size:11px; color:var(--anchor); background:rgba(19,100,196,.08);
+    border:1px solid rgba(19,100,196,.25); padding:3px 8px; border-radius:999px; cursor:pointer;
+  }
+  .reply-badge:active{background:rgba(19,100,196,.18);}
+  .reply-badge::before{content:"▶";}
+  .post-thumb-wrap{margin-top:6px;}
+  /* v3.6.0: 幅・高さを固定値で確保することで、画像の読み込み前後でDOMの高さ(scrollHeight)が
+     変化しなくなり、スクロール位置復元が画像読み込みのタイミングでズレる問題を根本から防ぐ。 */
+  .post-thumb{
+    display:block; width:140px; height:140px;
+    border-radius:8px; border:1px solid var(--line); cursor:zoom-in; background:var(--surface-2);
+    object-fit:cover;
+  }
+  .post-thumb:active{opacity:.8;}
+
+  /* ---- Image gallery (thread image list) ---- */
+  .gallery-grid{
+    display:grid; grid-template-columns:repeat(auto-fill,minmax(92px,1fr));
+    gap:12px; padding:14px;
+  }
+  .gallery-item{display:flex; flex-direction:column; align-items:center; gap:4px;}
+  .gallery-thumb{
+    width:100%; aspect-ratio:1/1; object-fit:cover; border-radius:8px;
+    border:1px solid var(--line); cursor:zoom-in; background:var(--surface-2); display:block;
+    /* v4.3.0: aspect-ratioは幅が決まった時点で高さを機械的に確定させるため、本来は
+       画像読み込み前後でも領域サイズは変化しない。とはいえ.post-thumb同様に
+       「明示的な最低高さ」も併記しておくことで、極端に古い環境でaspect-ratioが
+       効かない場合や、フォントサイズ変更等でグリッドの再計算タイミングがズレる
+       稀なケースでも、画像一覧ポップアップのスクロール領域が一切ガタつかないよう
+       二重に保証する（幅は可変グリッドのため、正方形を保つのはaspect-ratio側に任せ、
+       min-heightはあくまで最低限の“床”として機能させる）。 */
+    min-height:92px;
+  }
+  /* aspect-ratio未対応の極めて古い環境向けフォールバック。widthに関わらず固定高を与え、
+     少なくとも読み込み前後でレイアウトが変化しないことだけは保証する。 */
+  @supports not (aspect-ratio:1/1){
+    .gallery-thumb{ height:92px; }
+  }
+  .gallery-thumb:active{opacity:.8;}
+  .gallery-num{
+    font-family:var(--mono); font-size:11px; color:var(--anchor); font-weight:700;
+    background:transparent; border:0; padding:2px 6px; cursor:pointer; border-radius:6px;
+  }
+  .gallery-num:active{background:rgba(19,100,196,.14);}
+
+  /* ---- Jump-to-post flash (from gallery) ---- */
+  .post.flash-jump{animation:flashJumpPost 1.3s ease-out;}
+  @keyframes flashJumpPost{
+    0%{box-shadow:inset 0 0 0 999px rgba(19,100,196,.16);}
+    100%{box-shadow:inset 0 0 0 999px rgba(19,100,196,0);}
+  }
+
+  /* ---- Image lightbox ---- */
+  #imgLightbox{
+    position:fixed; inset:0; z-index:70; background:rgba(6,10,14,.9);
+    display:none; align-items:center; justify-content:center; padding:24px;
+  }
+  #imgLightbox.show{display:flex;}
+  #imgLightbox img{max-width:100%; max-height:100%; border-radius:10px; box-shadow:var(--shadow);}
+
+  /* ---- Compose bar ---- */
+  #composeBar{
+    position:absolute; left:0; right:0; bottom:0; z-index:20; background:var(--surface);
+    border-top:1px solid var(--line); padding:8px 10px calc(8px + env(safe-area-inset-bottom));
+    max-width:640px; margin:0 auto; box-shadow:0 -3px 14px rgba(18,28,38,.08); display:none;
+  }
+  #composeBar.show{display:block;}
+  .compose-collapsed{display:flex;}
+  .compose-open-btn{
+    flex:1; height:42px; border:1px dashed var(--accent); background:var(--surface-2); color:var(--accent);
+    border-radius:12px; font-weight:700; font-size:14px; cursor:pointer;
+  }
+  .compose-open-btn:active{background:#e8f2ef;}
+  .compose-form{display:none; flex-direction:column; gap:8px;}
+  #composeBar.expanded .compose-collapsed{display:none;}
+  #composeBar.expanded .compose-form{display:flex;}
+  .compose-form input,.compose-form textarea{
+    width:100%; font-family:var(--sans); font-size:16px; color:var(--text);
+    border:1px solid var(--line); border-radius:10px; padding:9px 11px; background:var(--surface-2);
+  }
+  .compose-form textarea{resize:vertical; min-height:64px; line-height:1.6;}
+  /* v3.7.0: スレ更新時の「下に〇件の新着レス」通知バッジ。
+     composeBarのすぐ上あたりに浮かせ、フェードイン/アウトで控えめに出し入れする。
+     res画面以外や非表示時にタップされないよう、pointer-eventsも連動させておく。 */
+  .new-arrival-notice{
+    position:absolute; left:50%; bottom:calc(70px + env(safe-area-inset-bottom));
+    transform:translate(-50%, 6px); z-index:18; margin:0; appearance:none; -webkit-appearance:none;
+    font-family:var(--sans); font-size:12.5px; font-weight:700; color:var(--ink);
+    background:var(--fab-bg); border:1px solid var(--fab-border); border-radius:999px;
+    padding:8px 16px; cursor:pointer; white-space:nowrap; box-shadow:var(--shadow-sm);
+    -webkit-backdrop-filter:blur(6px); backdrop-filter:blur(6px);
+    opacity:0; pointer-events:none; transition:opacity .22s ease, transform .22s ease;
+  }
+  .new-arrival-notice.show{opacity:1; transform:translate(-50%, 0); pointer-events:auto;}
+  .new-arrival-notice:active{opacity:.85;}
+  /* v3.5.0: 1000レス終了（DAT落ち）案内。通常時は非表示で、datochi状態のときだけ .show 相当で表示する */
+  .compose-datochi{
+    display:none; align-items:center; justify-content:center; text-align:center;
+    height:42px; border-radius:12px; background:var(--surface-2); border:1px solid var(--line);
+    color:var(--meta); font-size:13px; font-weight:700;
+  }
+  /* datochi中は「書き込む」ボタン群を完全に隠し、案内メッセージだけを表示する。
+     .expanded との併存時にも必ず優先されるよう !important で確定させる */
+  #composeBar.datochi .compose-collapsed,
+  #composeBar.datochi .compose-form{ display:none !important; }
+  #composeBar.datochi .compose-datochi{ display:flex !important; }
+
+  /* ---- Chmate-style floating nav (res view only) ---- */
+  .fab-nav{
+    position:absolute; right:14px; bottom:calc(96px + env(safe-area-inset-bottom));
+    z-index:15; display:flex; flex-direction:column; gap:10px;
+    opacity:0; transform:translateY(8px); pointer-events:none;
+    transition:opacity .18s ease, transform .18s ease;
+  }
+  .fab-nav.show{opacity:1; transform:translateY(0); pointer-events:auto;}
+  .fab-nav.fab-hide{opacity:0; transform:translateY(8px); pointer-events:none;}
+  .fab-btn{
+    width:46px; height:46px; border-radius:50%; flex:0 0 auto;
+    background:var(--fab-bg); color:var(--fab-ink); border:1px solid var(--fab-border);
+    font-family:var(--sans); font-size:17px; font-weight:700; cursor:pointer;
+    display:flex; align-items:center; justify-content:center;
+    opacity:.7; box-shadow:var(--shadow-sm);
+    -webkit-backdrop-filter:blur(6px); backdrop-filter:blur(6px);
+    transition:opacity .12s, transform .12s;
+  }
+  .fab-btn:active{opacity:1; transform:scale(.93);}
+  .fab-btn.fab-refresh{font-size:12.5px; letter-spacing:.5px;}
+  /* v4.0.0: 「【主】のみ」抽出表示トグル。ONの間は他のfab-btnと見分けが付くよう
+     アクセントカラーで塗りつぶし、常時はっきり視認できるようにする（opacityも1に固定）。 */
+  .fab-btn.fab-nushi{font-size:11px; letter-spacing:0; white-space:nowrap;}
+  .fab-btn.fab-nushi.on{background:var(--accent); color:var(--ink); opacity:1; border-color:transparent;}
+  .compose-form input:focus,.compose-form textarea:focus{outline:2px solid var(--accent); background:var(--surface);}
+  .compose-actions{display:flex; gap:8px;}
+  .btn{border:0; border-radius:10px; font-weight:700; font-size:14px; padding:10px 14px; cursor:pointer;}
+  .btn.ghost{background:var(--surface-2); color:var(--text-2); border:1px solid var(--line);}
+  .btn.primary{background:var(--accent); color:var(--ink); flex:1;}
+  .btn.primary:active{background:var(--accent-2);}
+  .btn.ghost:active{background:#e6eaef;}
+  .btn:disabled{opacity:.5; cursor:default; pointer-events:none;}
+
+  /* ---- Scrim + popups ---- */
+  #scrim{position:fixed; inset:0; background:rgba(10,16,22,.42); z-index:40; display:none;}
+  #scrim.show{display:block;}
+  #popupLayer{position:fixed; inset:0; z-index:41; display:none; pointer-events:none;}
+  #popupLayer.show{display:block;}
+  .popup{
+    position:absolute; left:50%; top:50%; transform:translate(-50%,-50%);
+    width:min(92vw,560px); max-height:72dvh; background:var(--surface); border-radius:14px;
+    box-shadow:var(--shadow); overflow:hidden; pointer-events:auto; display:flex; flex-direction:column;
+    animation:pop .13s ease-out;
+  }
+  @keyframes pop{from{opacity:0; transform:translate(-50%,-46%) scale(.97);}}
+  .popup-head{
+    display:flex; align-items:center; gap:6px; padding:8px 8px 8px 14px;
+    background:var(--surface-2); border-bottom:1px solid var(--line); font-family:var(--mono);
+    font-size:12px; color:var(--text-2); flex:0 0 auto;
+  }
+  .popup-head-title{flex:1 1 auto; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
+  .popup-head-actions{flex:0 0 auto; display:flex; gap:6px;}
+  .ng-add-btn{
+    font-family:var(--sans); font-size:12px; font-weight:700; color:var(--new); background:rgba(226,74,74,.1);
+    border:1px solid rgba(226,74,74,.35); border-radius:999px; padding:6px 10px; cursor:pointer; white-space:nowrap;
+  }
+  .ng-add-btn:active{background:rgba(226,74,74,.2);}
+  .popup-close{width:34px; height:34px; border:0; background:transparent; font-size:18px; color:var(--text-2); cursor:pointer; border-radius:8px;}
+  .popup-close:active{background:#e6eaef;}
+  .popup-body{overflow-y:auto; -webkit-overflow-scrolling:touch;}
+  .popup-body .post{border-bottom:1px solid var(--line);}
+  .popup-body .post:last-child{border-bottom:0;}
+  .popup-empty{padding:22px 16px; text-align:center; color:var(--meta); font-size:13px;}
+  .ng-list-row{
+    display:flex; align-items:center; justify-content:space-between; gap:10px;
+    padding:12px 14px; border-bottom:1px solid var(--line);
+  }
+  .ng-list-row:last-child{border-bottom:0;}
+  .ng-list-id{font-family:var(--mono); font-size:13px; color:var(--text); word-break:break-all;}
+  /* v3.6.0: NG管理ポップアップのタブ切替UI */
+  .ng-tab-bar{display:flex; flex:0 0 auto; border-bottom:1px solid var(--line); background:var(--surface);}
+  .ng-tab-btn{
+    flex:1; padding:10px 6px; text-align:center; font-size:12.5px; font-weight:700;
+    color:var(--text-2); background:transparent; border:0; border-bottom:2px solid transparent; cursor:pointer;
+  }
+  .ng-tab-btn.active{color:var(--accent); border-bottom-color:var(--accent);}
+  .ng-add-row{display:flex; gap:8px; padding:10px 14px; border-bottom:1px solid var(--line); flex:0 0 auto; background:var(--surface);}
+  .ng-add-row input{
+    flex:1 1 auto; min-width:0; font-family:var(--sans); font-size:14px; color:var(--text);
+    border:1px solid var(--line); border-radius:9px; padding:8px 10px; background:var(--surface-2);
+  }
+  .ng-add-row input:focus{outline:2px solid var(--accent); background:var(--surface);}
+  .ng-add-submit-btn{
+    flex:0 0 auto; font-weight:700; font-size:13px; color:var(--ink); background:var(--accent);
+    border:0; border-radius:9px; padding:0 16px; cursor:pointer;
+  }
+  .ng-add-submit-btn:active{background:var(--accent-2);}
+  /* v4.4.0: カスタム板追加フォームは入力欄が2つになるため、.ng-add-rowを縦積みに
+     する修飾子クラス。inputやボタン自体のスタイルは.ng-add-row側の子孫セレクタを
+     そのまま流用できるので、新規のスタイル定義を最小限に抑えられる。 */
+  .ng-add-row.column{ flex-direction:column; align-items:stretch; }
+  .ng-add-row.column .ng-add-submit-btn{ padding:10px 16px; }
+
+  /* ---- Res menu (pnum / header tap popup) ---- */
+  .pnum{cursor:pointer;}
+  .post-head{cursor:pointer;}
+  .res-menu{
+    position:fixed; z-index:55; min-width:180px; max-width:min(78vw,260px);
+    background:var(--surface); border:1px solid var(--line); border-radius:12px;
+    box-shadow:var(--shadow); padding:5px; overflow:hidden;
+    animation:resMenuPop .12s ease-out;
+  }
+  @keyframes resMenuPop{from{opacity:0; transform:scale(.96);}}
+  .res-menu-item{
+    display:flex; align-items:center; gap:8px; width:100%; text-align:left;
+    background:transparent; border:0; border-radius:8px; cursor:pointer;
+    font-family:var(--sans); font-size:14px; color:var(--text); padding:10px 10px;
+  }
+  .res-menu-item:active{background:var(--surface-2);}
+  .res-menu-item .rmi-ico{flex:0 0 auto; width:18px; text-align:center; font-size:14px;}
+  .res-menu-item.danger{color:var(--new);}
+  .res-menu-sep{height:1px; background:var(--line); margin:3px 4px;}
+
+  /* ---- Live data loading overlay ---- */
+  #loadingOverlay{
+    position:fixed; inset:0; z-index:80; display:none; align-items:center; justify-content:center;
+    background:rgba(10,16,22,.08); pointer-events:none;
+  }
+  #loadingOverlay.show{display:flex;}
+  .loading-card{
+    display:flex; align-items:center; gap:10px; background:var(--surface); color:var(--text-2);
+    padding:12px 20px; border-radius:999px; box-shadow:var(--shadow); font-size:13px;
+    opacity:.96; border:1px solid var(--line);
+  }
+  .loading-spinner{
+    width:16px; height:16px; flex:0 0 auto; border-radius:50%;
+    border:2.5px solid var(--line); border-top-color:var(--accent);
+    animation:loadingSpin .7s linear infinite;
+  }
+  @keyframes loadingSpin{to{transform:rotate(360deg);}}
+  .pill.live{background:rgba(14,124,102,.12); color:var(--accent); border:1px solid rgba(14,124,102,.35); font-weight:700;}
+  html[data-theme="dark"] .pill.live{background:rgba(18,150,122,.16);}
+
+  /* ---- Drawer ---- */
+  #drawer{
+    position:fixed; top:0; right:0; height:100dvh; width:min(80vw,320px); background:var(--surface);
+    z-index:50; transform:translateX(100%); transition:transform .22s cubic-bezier(.2,.7,.3,1);
+    box-shadow:var(--shadow); display:flex; flex-direction:column; padding-top:env(safe-area-inset-top);
+  }
+  #drawer.show{transform:translateX(0);}
+  .drawer-head{padding:16px; border-bottom:1px solid var(--line);}
+  .drawer-head h2{margin:0; font-size:16px;}
+  .drawer-head .ver{font-family:var(--mono); font-size:12px; color:var(--meta);}
+  .drawer-item{
+    display:flex; align-items:center; gap:12px; padding:15px 16px; border-bottom:1px solid var(--line);
+    font-size:15px; cursor:pointer; background:var(--surface);
+  }
+  .drawer-item:active{background:var(--surface-2);}
+  .drawer-item .di-ico{width:24px; text-align:center; font-size:18px; flex:0 0 auto;}
+  .drawer-item .di-body{flex:1 1 auto; min-width:0;}
+  .drawer-item small{display:block; color:var(--meta); font-size:11.5px; margin-top:1px;}
+  .drawer-item.danger .di-body > div:first-child{color:var(--new); font-weight:700;}
+  .drawer-item.danger small{color:var(--new); opacity:.75;}
+  .drawer-note{padding:14px 16px; color:var(--meta); font-size:11.5px; line-height:1.6; margin-top:auto;}
+
+  /* ---- v2.3.0: テーマ切り替えスイッチ（設定画面内） ---- */
+  .theme-switch{
+    width:46px; height:27px; border-radius:999px; background:var(--line); position:relative;
+    flex:0 0 auto; transition:background .18s ease;
+  }
+  .theme-switch .ts-knob{
+    position:absolute; top:2px; left:2px; width:23px; height:23px; border-radius:50%;
+    background:#fff; box-shadow:var(--shadow-sm); transition:transform .18s ease;
+  }
+  html[data-theme="dark"] .theme-switch{background:var(--accent);}
+  html[data-theme="dark"] .theme-switch .ts-knob{transform:translateX(19px);}
+
+  /* ---- Toast ---- */
+  #toast{
+    position:fixed; left:50%; bottom:calc(24px + env(safe-area-inset-bottom)); transform:translateX(-50%) translateY(20px);
+    background:#1b232b; color:#fff; padding:11px 18px; border-radius:999px; font-size:13px; z-index:60;
+    opacity:0; pointer-events:none; transition:opacity .2s, transform .2s; max-width:88vw; text-align:center;
+  }
+  #toast.show{opacity:1; transform:translateX(-50%) translateY(0);}
+
+  .empty{padding:40px 20px; text-align:center; color:var(--meta); font-size:14px;}
+
+  /* ---- v2.8.0: 次スレ候補検索セクション（タップするまで候補は非表示のアコーディオン） ---- */
+  .next-thread-section{
+    padding:16px; border-top:1px solid var(--line); background:var(--surface);
+  }
+  .next-thread-btn{
+    width:100%; padding:12px 14px; background:var(--accent); color:var(--ink);
+    border:0; border-radius:10px; font-weight:700; font-size:14px; cursor:pointer;
+    display:flex; align-items:center; justify-content:center; gap:6px;
+  }
+  .next-thread-btn:active{background:var(--accent-2);}
+  .next-thread-candidates{
+    margin-top:12px; display:flex; flex-direction:column; gap:8px;
+  }
+  .next-thread-link{
+    padding:10px 12px; background:var(--surface-2); border:1px solid var(--line);
+    border-radius:8px; color:var(--text); text-decoration:none; font-size:13px;
+    cursor:pointer; display:block;
+  }
+  .next-thread-link:active{background:var(--line);}
+  .next-thread-empty{
+    padding:10px 12px; text-align:center; color:var(--meta); font-size:12px;
+  }
+
+  /* ---- New-read bookmark divider ---- */
+  .new-divider{
+    display:flex; align-items:center; justify-content:center; gap:6px;
+    font-family:var(--mono); font-size:11.5px; font-weight:700; color:var(--new);
+    background:rgba(226,74,74,.08); border-top:1px dashed var(--new); border-bottom:1px dashed var(--new);
+    padding:7px 10px; letter-spacing:.3px;
+  }
+  .new-divider.flash{animation:flashNew 1.6s ease-out;}
+  @keyframes flashNew{
+    0%{background:rgba(226,74,74,.4);}
+    100%{background:rgba(226,74,74,.08);}
+  }
+  /* ---- v2.5.0: ホーム画面 下部タブナビゲーション（Chmate風） ---- */
+  #homeTabBar{
+    position:absolute; left:0; right:0; bottom:0; z-index:20; display:none;
+    align-items:stretch; justify-content:space-around; background:rgba(255,255,255,.86);
+    border-top:1px solid var(--line); padding:5px 6px calc(5px + env(safe-area-inset-bottom));
+    max-width:640px; margin:0 auto; box-shadow:0 -3px 14px rgba(18,28,38,.1);
+    -webkit-backdrop-filter:blur(14px); backdrop-filter:blur(14px);
+  }
+  #homeTabBar.show{display:flex;}
+  html[data-theme="dark"] #homeTabBar{background:rgba(26,31,38,.82);}
+  #main.has-hometab{padding-bottom:calc(58px + env(safe-area-inset-bottom));}
+  .home-tab-btn{
+    flex:1; display:flex; flex-direction:column; align-items:center; justify-content:center;
+    gap:2px; background:transparent; border:0; padding:7px 4px 6px; border-radius:12px;
+    cursor:pointer; color:var(--text-2); font-family:var(--sans);
+  }
+  .home-tab-btn:active{background:var(--surface-2);}
+  .home-tab-btn .hti{font-size:19px; line-height:1;}
+  .home-tab-btn .htl{font-size:10.5px; font-weight:700; letter-spacing:.2px;}
+  .home-tab-btn.active{color:var(--accent);}
+  .home-tab-btn .htbadge{
+    position:relative; top:-1px; font-family:var(--mono); font-size:9.5px; font-weight:700;
+    color:var(--new); margin-left:2px;
+  }
+</style>
+</head>
+<body>
+<div id="app">
+  <header id="hdr">
+    <button class="hbtn" id="backBtn" aria-label="戻る">◁</button>
+    <div id="hdrTitle">5ch ブラウザ</div>
+    <button class="hbtn hide" id="threadMenuBtn" aria-label="スレメニュー">⋮</button>
+    <button class="hbtn" id="menuBtn" aria-label="設定">☰</button>
+  </header>
+
+  <main id="main"></main>
+
+  <!-- v3.7.0: スレ更新時の新着レス通知バッジ。#main内ではなく#app直下に置き、composeBarの上に浮かせる -->
+  <button id="newArrivalNotice" class="new-arrival-notice" data-act="new-arrival-jump" type="button"></button>
+
+  <div id="composeBar">
+    <div class="compose-collapsed">
+      <button class="compose-open-btn" data-act="compose-open">＋ このスレに書き込む</button>
+    </div>
+    <div class="compose-form">
+      <input id="cName" type="text" placeholder="名前（空欄で名無し）" autocomplete="off">
+      <textarea id="cBody" placeholder="本文（例: &gt;&gt;5 それな）"></textarea>
+      <div class="compose-actions">
+        <button class="btn ghost" data-act="compose-cancel">キャンセル</button>
+        <button class="btn primary" data-act="compose-post">書き込む</button>
+      </div>
+    </div>
+    <!-- v3.5.0: 1000レス終了（DAT落ち）時の案内。#composeBar.datochi のときだけ表示される -->
+    <div class="compose-datochi">🚫 このスレッドは1000を超えました。新しいレスは書き込めません。</div>
+  </div>
+
+  <div id="fabNav" class="fab-nav">
+    <button class="fab-btn" data-act="scroll-top" aria-label="スレの最上部へ">▲</button>
+    <!-- v4.0.0: スレ主（>>1）のレスだけを抽出表示するトグルボタン -->
+    <button class="fab-btn fab-nushi" data-act="nushi-toggle" aria-label="スレ主のみ表示">【主】</button>
+    <button class="fab-btn" data-act="gallery-open" aria-label="画像一覧">🖼</button>
+    <button class="fab-btn fab-refresh" data-act="thread-refresh" aria-label="新着レスを更新">更新</button>
+    <button class="fab-btn" data-act="scroll-bottom" aria-label="スレの最下部へ">▼</button>
+  </div>
+
+  <div id="homeTabBar">
+    <button class="home-tab-btn" data-act="home-tab" data-hometab="boards" aria-label="板一覧">
+      <span class="hti">📋</span><span class="htl">板一覧</span>
+    </button>
+    <button class="home-tab-btn" data-act="home-tab" data-hometab="fav" aria-label="お気に入り">
+      <span class="hti">★</span><span class="htl">お気に入り</span>
+    </button>
+    <button class="home-tab-btn" data-act="home-tab" data-hometab="history" aria-label="履歴">
+      <span class="hti">🕒</span><span class="htl">履歴</span>
+    </button>
+  </div>
+</div>
+
+<div id="scrim"></div>
+<div id="popupLayer"></div>
+
+<div id="drawer">
+  <div class="drawer-head">
+    <h2>設定 <span class="ver" id="drawerVerText">v4.7.0</span></h2>
+  </div>
+  <div class="drawer-item" data-act="export">
+    <div class="di-ico">💾</div>
+    <div class="di-body">
+      <div>バックアップ</div>
+      <small>現在のデータをファイルに書き出します</small>
+    </div>
+  </div>
+  <div class="drawer-item" data-act="import">
+    <div class="di-ico">📂</div>
+    <div class="di-body">
+      <div>復元</div>
+      <small>バックアップファイルからデータを読み込みます</small>
+    </div>
+  </div>
+  <div class="drawer-item" data-act="ng-manage">
+    <div class="di-ico">🚫</div>
+    <div class="di-body">
+      <div>NG管理</div>
+      <small>NG-ID・NGワード（本文フィルタ）の追加・削除</small>
+    </div>
+  </div>
+  <div class="drawer-item" data-act="customboard-manage-open">
+    <div class="di-ico">🌐</div>
+    <div class="di-body">
+      <div>カスタム板を追加・管理</div>
+      <small>おーぷん2chのURLから好きな板を登録・削除します</small>
+    </div>
+  </div>
+  <div class="drawer-item" data-act="theme-toggle" id="drawerThemeItem">
+    <div class="di-ico" id="drawerThemeIcon">🌙</div>
+    <div class="di-body">
+      <div>テーマ切り替え</div>
+      <small id="drawerThemeLabel">ライトモード</small>
+    </div>
+    <div class="theme-switch" id="themeSwitch"><div class="ts-knob"></div></div>
+  </div>
+  <div class="drawer-item danger" data-act="data-clear-all">
+    <div class="di-ico">🗑️</div>
+    <div class="di-body">
+      <div>データ全消去</div>
+      <small>お気に入り・既読履歴・設定をすべて初期化します</small>
+    </div>
+  </div>
+  <div class="drawer-note" id="drawerNoteText">
+    5ch ブラウザ v4.8.0
+  </div>
+</div>
+
+<input id="importFile" type="file" accept=".json" style="display:none;">
+<div id="loadingOverlay">
+  <div class="loading-card">
+    <div class="loading-spinner"></div>
+    <span>読み込み中...</span>
+  </div>
+</div>
+<div id="toast"></div>
+<div id="imgLightbox">
+  <img id="imgLightboxImg" alt="">
+</div>
+
+<script>
+const VERSION = '4.8.0';
+const APP_ID = '5ch-viewer';
+const LS_KEY = APP_ID + '-persist';
+
+/* ---- PWA: Service Worker登録 ----
+   VERSIONをそのままクエリパラメータに使い、Wordの再デプロイ時に
+   ブラウザキャッシュを突破してsw.js自体の更新を確実に検知させる。
+   新しいSWがactivateしてcontroller交代を検知したら、
+   ユーザー操作を挟まず自動リロードする（ダブルガードでreload連打防止）。 */
+if('serviceWorker' in navigator){
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('./sw.js?v=' + VERSION).catch(()=>{});
+  });
+  let swRefreshing = false;
+  navigator.serviceWorker.addEventListener('controllerchange', () => {
+    if(swRefreshing) return;
+    swRefreshing = true;
+    window.location.reload();
+  });
+}
+
+/* ---- Utilities ---- */
+const $ = (sel) => document.querySelector(sel);
+const $$ = (sel) => document.querySelectorAll(sel);
+function esc(s){ return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+function pick(rng, arr){ return arr[Math.floor(rng()*arr.length)]; }
+function todayStr(){ const d=new Date(); return d.getFullYear()+String(d.getMonth()+1).padStart(2,'0')+String(d.getDate()).padStart(2,'0'); }
+function hashStr(s){
+  let h=0;
+  for(let i=0;i<s.length;i++){ const c=s.charCodeAt(i); h=((h<<5)-h)+c; h|=0; }
+  return h;
+}
+function mulberry32(a){
+  return function(){
+    var t=a+=0x6D2B79F5; t=Math.imul(t^t>>>15,t|1); t^=t+Math.imul(t^t>>>7,t|61); return((t^t>>>14)>>>0)/4294967296;
+  };
+}
+function formatDate(ts){
+  const d=new Date(ts);
+  const y=d.getFullYear(), m=d.getMonth()+1, dd=d.getDate(), h=d.getHours(), min=d.getMinutes();
+  return `${y}/${String(m).padStart(2,'0')}/${String(dd).padStart(2,'0')} ${String(h).padStart(2,'0')}:${String(min).padStart(2,'0')}`;
+}
+function genId(rng){
+  const chars='abcdef0123456789';
+  let s='';
+  for(let i=0;i<8;i++) s+=chars[Math.floor(rng()*16)];
+  return s;
+}
+function defaultName(boardName){
+  return boardName.includes('番組')||boardName.includes('実況')?'実況民':'名無しさん';
+}
+
+/* ---- Data structures (dummy data for demo) ---- */
+const BOARDS = [
+  {id:'anime', name:'アニメ', color:'#E77FD6', cat:'総合'},
+  {id:'livejupiter', name:'なんでも実況', color:'#76D67B', cat:'実況'},
+  {id:'prog', name:'プログラミング', color:'#00A5FF', cat:'技術'},
+  {id:'newsplus', name:'ニュース速報+', color:'#F29B4E', cat:'ニュース'},
+  {id:'news4vip', name:'VIP', color:'#9468DA', cat:'実況'},
+];
+const THREADS = {
+  anime:[
+    {id:'anime-1',title:'新作アニメ情報スレッド',res:980,createdAt:1705000000000},
+    {id:'anime-2',title:'秋アニメ感想スレ',res:750,createdAt:1704999000000},
+  ],
+  prog:[
+    {id:'prog-1',title:'JavaScript質問スレ',res:520,createdAt:1704998000000},
+  ],
+  newsplus:[
+    {id:'newsplus-1',title:'速報: 新型GPU発表',res:999,createdAt:1704997000000},
+    {id:'newsplus-2',title:'テクノロジーニュース',res:640,createdAt:1704996000000},
+  ],
+  livejupiter:[
+    {id:'livejupiter-1',title:'○○実況',res:1000,createdAt:1704995000000},
+    {id:'livejupiter-2',title:'□□放送実況',res:850,createdAt:1704994000000},
+  ],
+  news4vip:[
+    {id:'news4vip-1',title:'VIPスレ',res:720,createdAt:1704993000000},
+  ],
+};
+
+const SNIP = [
+  'それな','わかる','ほんと','まじで','やばい','最高','最悪','もう終わり','やばすぎ',
+  '答えは簡単','パターン化している','これしかない','誰でもできる','むしろ当然',
+];
+const GEN_CACHE = {};
+const HANDWRITTEN = {
+  'anime-1':[
+    {num:1,name:'作成者',date:'2024/01/12 14:30',id:'ID:abc12345',body:'スレを立てました'},
+  ],
+};
+
+/* ---- Generate dummy posts for demo ---- */
+function genPosts(threadId){
+  const t = THREAD_INDEX[threadId];
+  if(!t) return [];
+  const board = BOARDS.find(b=>b.id===t.boardId);
+  const rng = mulberry32(hashStr(threadId));
+  const created = t.createdAt;
+  const span = Math.max(Date.now()-created, 3600e3);
+  const dname = defaultName(board.name);
+  const n = t.res;
+  const out = [];
+  for(let i=1;i<=n;i++){
+    let body;
+    if(i>1 && rng()<0.38){ const k=1+Math.floor(rng()*(i-1)); body=`>>${k} `+pick(rng,SNIP); }
+    else body = pick(rng,SNIP);
+    if(rng()<0.22) body += 'ｗ'.repeat(1+Math.floor(rng()*4));
+    /* v2.4.0: デモ用に一定確率で画像URLを本文へ付与（画像ギャラリー機能の動作確認用） */
+    if(rng()<0.07) body += ' https://placehold.co/500x500.jpg?text=' + (1+Math.floor(rng()*999));
+    const ts = created + Math.floor(span*(i/(n+1))) + Math.floor(rng()*45000);
+    out.push({num:i, name: rng()<0.88?dname:'名無しさん', date:formatDate(ts), id:genId(rng), body});
+  }
+  return out;
+}
+function basePosts(threadId){
+  if(LIVE_POSTS[threadId]) return LIVE_POSTS[threadId];
+  if(HANDWRITTEN[threadId]) return HANDWRITTEN[threadId];
+  if(!GEN_CACHE[threadId]) GEN_CACHE[threadId] = genPosts(threadId);
+  return GEN_CACHE[threadId];
+}
+
+/* ---------- index ---------- */
+const THREAD_INDEX = {};
+Object.keys(THREADS).forEach(bid=>THREADS[bid].forEach(t=>{ t.boardId=bid; THREAD_INDEX[t.id]=t; }));
+
+/* =========================================================================
+   おーぷん2ch（open2ch.net）実データ連携
+   - ブラウザから直接 open2ch へ fetch するとCORSでブロックされるため、
+     無料のパブリックCORSプロキシ（allorigins）を経由して取得する。
+   - 対応している板（OPEN2CH_BOARDS）のみ実データに切り替わり、
+     それ以外の板は従来どおりダミーデータのまま動作する。
+   - 自分の書き込み（postMessage）は今までどおりローカル(localStorage)に
+     追記されるだけで、実際に open2ch へ書き込むことはしない（ハイブリッド仕様）。
+   ========================================================================= */
+const CORS_PROXY = 'https://api.allorigins.win/get?url=';
+const OPEN2CH_BOARDS = {
+  newsplus:    {server:'uni.open2ch.net',      key:'newsplus'},
+  news4vip:    {server:'hayabusa.open2ch.net', key:'news4vip'},
+  livejupiter: {server:'hayabusa.open2ch.net', key:'livejupiter'},
+  anime:       {server:'toro.open2ch.net',     key:'anime'},
+};
+const LIVE_POSTS = {};
+
+/* =========================================================================
+   v4.4.0: カスタム板（ユーザーが自由に追加するおーぷん2chの板）
+   - persist.customBoards（永続化データ）を「唯一の正」として扱い、
+     実行時のBOARDS配列・OPEN2CH_BOARDSマップへ都度反映(applyCustomBoards)する
+     設計にすることで、追加した板は既存の板と全く同じ経路
+     （ensureLiveThreads / resolveLiveThread / ensureLivePosts / お気に入り板登録）
+     でシームレスに動作する。専用の別ルートを新設しない、というのがポイント。
+   - 板ID(=OPEN2CH_BOARDSのキー)には、resolveLiveThread()が
+     `threadId.indexOf('-')`で「最初のハイフン」を板IDとスレキーの区切りとして
+     使っている既存の実装上の制約があるため、ハイフンを含むキーは登録できない
+     （そもそもopen2chの板キーは英数字/アンダースコアのみが実態）。
+   ========================================================================= */
+/* 板URL（または "server/key" 形式）を解析してserver/keyを取り出す。
+   解析できない入力（プロトコルもスラッシュも無い単なる単語など）はnullを返す。
+   v4.4.0: 板のルートURL（例: https://hayabusa.open2ch.net/livejupiter/）だけでなく、
+   ユーザーが誤ってスレッドのURL（例: https://hayabusa.open2ch.net/test/read.cgi/
+   livejupiter/1234567890/）を貼り付けてしまうケースも想定し、read.cgi形式を
+   優先的に判定することで「test」を板キーとして誤登録してしまう事故を防ぐ。 */
+function parseOpen2chBoardInput(raw){
+  let s = String(raw||'').trim();
+  if(!s) return null;
+  s = s.replace(/^https?:\/\//i, '');
+  /* v4.4.0バグ修正: キー部分の正規表現をここで[a-zA-Z0-9_]+に絞ってしまうと、
+     例えば"my-board"のような入力に対して"my"だけを黙って抜き出してしまい、
+     ユーザーが意図した板とは違う（存在しない）板キーで静かに登録される事故が
+     起こり得た。ここではパス区切り("/")までを丸ごとキー候補として捕捉するに
+     留め、英数字・アンダースコア以外の文字が混ざっていないかの妥当性チェックは
+     呼び出し側（addCustomBoard）に明示的に委ね、不正な場合ははっきり
+     エラーとして弾く（黙って切り詰めない）方針に統一する。 */
+  let m = s.match(/^([a-zA-Z0-9.-]+)\/test\/read\.cgi\/([^\/?#]+)/i);
+  if(m) return { server: m[1], key: m[2] };
+  m = s.match(/^([a-zA-Z0-9.-]+)\/+([^\/?#]+)/);
+  if(!m) return null;
+  return { server: m[1], key: m[2] };
+}
+/* persist.customBoards（永続化データ）の内容を、実行時のBOARDS配列と
+   OPEN2CH_BOARDSマップへ反映し直す。何度呼んでも安全な冪等設計にしてあり、
+   起動時・インポート直後・板の追加/削除の直後、いずれのタイミングでも
+   呼ぶだけで常に「永続化データと実行時状態が1対1で一致した状態」に揃えられる。 */
+function applyCustomBoards(){
+  /* 既存のカスタム板をBOARDS/OPEN2CH_BOARDSからいったん全て取り除いてから、
+     persist.customBoardsの内容だけで作り直す（インポートで丸ごと入れ替わった
+     場合でも、古いカスタム板が亡霊のように残り続けることがないようにする） */
+  for(let i=BOARDS.length-1; i>=0; i--){
+    if(BOARDS[i].custom){ delete OPEN2CH_BOARDS[BOARDS[i].id]; BOARDS.splice(i,1); }
+  }
+  const list = Array.isArray(persist.customBoards) ? persist.customBoards : [];
+  list.forEach(cb=>{
+    if(!cb || !cb.id || !cb.server || !cb.key) return;
+    if(BOARDS.some(b=>b.id===cb.id)) return; /* デフォルト板との衝突は既にaddCustomBoard側で弾いているが念のため二重防御 */
+    BOARDS.push({ id:cb.id, name:cb.name||cb.id, color:cb.color||'#8A93A1', cat:'カスタム板', custom:true });
+    OPEN2CH_BOARDS[cb.id] = { server:cb.server, key:cb.key };
+  });
+}
+/* v4.5.0: カスタム板の内部ID（BOARDS/OPEN2CH_BOARDSのキー）を生成する。
+   単なる板キー(key)だけだと、サーバー(ドメイン)が異なるだけで同じフォルダ名の
+   板同士が衝突してしまうため、サーバー名を合成してユニーク化する。
+   resolveLiveThread()が`threadId.indexOf('-')`で「最初のハイフン」を
+   板IDとスレキーの区切りとして使っている既存仕様があるため、生成するIDには
+   ハイフンを一切含めてはならない。サーバー名にはドット(.)だけでなく
+   ハイフン(-)を含むホスト名（例: some-mirror.open2ch.net）が将来的に
+   存在する可能性もゼロではないため、ドットとハイフンの両方をアンダースコアへ
+   正規化してから結合する（keyの方は呼び出し側で既に[a-zA-Z0-9_]+として
+   検証済みのため、ハイフンが混入することはない）。 */
+function buildCustomBoardId(server, key){
+  const sanitizedServer = String(server||'').replace(/[.-]/g, '_');
+  return `${sanitizedServer}_${key}`;
+}
+/* キーの文字列から見た目上一定の色を決定する（毎回ランダムだとリロードのたびに
+   色が変わってしまい体験として気持ち悪いため、ハッシュ値で固定する） */
+const CUSTOM_BOARD_PALETTE = ['#E77FD6','#76D67B','#00A5FF','#F29B4E','#9468DA','#4FB6C4','#D97A5B','#7C93D9'];
+function colorForCustomBoardKey(key){
+  return CUSTOM_BOARD_PALETTE[Math.abs(hashStr(key)) % CUSTOM_BOARD_PALETTE.length];
+}
+/* v4.6.0: 指定した板IDに属する全スレッドのデータを、永続化領域(persist)から
+   丸ごと綺麗に削除する清掃ヘルパー。「板ID + '-'」で始まるスレIDを対象とする
+   判定方法は、migrateCustomBoardIds()のrewriteThreadId()と同じ考え方
+   （カスタム板IDには絶対にハイフンが含まれない設計のため、この前方一致判定は
+   誤って無関係な他スレを巻き込まず安全に成立する）。
+   配列/オブジェクトいずれも、想定外にundefinedや別の型になっていてもクラッシュ
+   しないよう、操作前に型チェックのガードを入れてある。 */
+function purgeThreadDataForBoard(boardId){
+  if(!boardId) return;
+  const prefix = boardId + '-';
+  const belongsToBoard = tid => typeof tid==='string' && tid.indexOf(prefix)===0;
+  if(Array.isArray(persist.favorites)){
+    persist.favorites = persist.favorites.filter(id=>!belongsToBoard(id));
+  }
+  if(Array.isArray(persist.history)){
+    persist.history = persist.history.filter(id=>!belongsToBoard(id));
+  }
+  ['read','draft','scrollPositions','localPosts','threadCache'].forEach(key=>{
+    const store = persist[key];
+    if(store && typeof store==='object' && !Array.isArray(store)){
+      Object.keys(store).forEach(tid=>{ if(belongsToBoard(tid)) delete store[tid]; });
+    }
+  });
+}
+/* カスタム板の新規追加。成功時はtrue、失敗時はfalseを返し、失敗理由はtoastで通知する。
+   プロアクティブ・デバッグ対応：不正URL・非open2chドメイン・デフォルト板との重複・
+   カスタム板同士の重複・resolveLiveThread()のハイフン分割仕様と衝突するキーなど、
+   考えられるエッジケースをすべてここで先回りして弾く。 */
+function addCustomBoard(rawUrl, rawName){
+  const parsed = parseOpen2chBoardInput(rawUrl);
+  if(!parsed){
+    toast('URLの形式が正しくありません（例: https://hayabusa.open2ch.net/livejupiter/）');
+    return false;
+  }
+  const { server, key } = parsed;
+  if(!/(^|\.)open2ch\.net$/i.test(server)){
+    toast('おーぷん2ch（open2ch.net）のURLを入力してください');
+    return false;
+  }
+  /* keyは正規表現 [a-zA-Z0-9_]+ でしか抽出されないため、この時点でハイフンや
+     記号を含むことはあり得ないが、念のため板IDとしての妥当性を再確認しておく */
+  if(!/^[a-zA-Z0-9_]+$/.test(key)){
+    toast('板キーの形式が正しくありません');
+    return false;
+  }
+  /* v4.5.0バグ修正: 板の内部ID(BOARDS/OPEN2CH_BOARDSのキー)にkeyそのものを
+     使っていたため、サーバー(ドメイン)が異なるだけで同じフォルダ名(key)を持つ
+     別の板（例: uni.open2ch.net/newsplus と hayabusa.open2ch.net/newsplus）を
+     衝突として弾いてしまい、両方を同時に登録できなかった。
+     buildCustomBoardId()でサーバー名を合成したユニークな内部IDを作ることで解決する。
+     このIDにハイフンが1文字でも混入すると、resolveLiveThread()が
+     `threadId.indexOf('-')`で「最初のハイフン」を板IDとスレキーの区切りとして
+     使っている既存仕様と衝突して壊れるため、buildCustomBoardId()側でハイフンを
+     一切含まない文字列になることを保証している（詳細は同関数のコメント参照）。 */
+  const id = buildCustomBoardId(server, key);
+  if(BOARDS.some(b=>b.id===id)){
+    toast('既に登録されている板です');
+    return false;
+  }
+  if(!Array.isArray(persist.customBoards)) persist.customBoards=[];
+  if(persist.customBoards.some(cb=>cb.id===id)){
+    toast('既に登録されている板です');
+    return false;
+  }
+  const name = String(rawName||'').trim() || key;
+  const cb = { id, name, server, key, color:colorForCustomBoardKey(id), addedAt:Date.now() };
+  persist.customBoards.push(cb);
+  /* v4.6.0: せっかく追加した板をわざわざ一覧の最下部まで探しに戻って★を
+     押さなくても済むよう、登録と同時に自動でお気に入り板(favBoards)へ
+     加えておく親切設計。既に何らかの理由で登録済みだった場合の重複防止と、
+     favBoards自体が万一配列でなかった場合の初期化ガードも入れておく。 */
+  if(!Array.isArray(persist.favBoards)) persist.favBoards=[];
+  if(!persist.favBoards.includes(id)) persist.favBoards.push(id);
+  savePersist();
+  applyCustomBoards();
+  toast(`「${name}」を追加し、お気に入り板に登録しました`);
+  return true;
+}
+/* カスタム板の削除。関連するスレッドデータ（THREADS/THREAD_INDEX/LIVE_POSTS）や
+   お気に入り板登録も一緒に掃除し、亡霊データが残らないようにする。
+   v4.6.0: さらにLocalStorageへ永続化される側（favorites/history/read/draft/
+   scrollPositions/localPosts/threadCache）のスレ単位データもpurgeThreadDataForBoard()
+   で丸ごと清掃し、板の追加・削除を繰り返してもゴミデータが溜まり続けないようにする。
+   削除対象の板を今まさに閲覧中だった場合は、クラッシュを避けるためホームへ戻す。 */
+function removeCustomBoard(id){
+  if(!Array.isArray(persist.customBoards)) return;
+  const idx = persist.customBoards.findIndex(cb=>cb.id===id);
+  if(idx<0) return;
+  const removed = persist.customBoards[idx];
+  persist.customBoards.splice(idx,1);
+  const favIdx = persist.favBoards.indexOf(id);
+  if(favIdx>=0) persist.favBoards.splice(favIdx,1);
+  delete THREADS[id];
+  Object.keys(THREAD_INDEX).forEach(tid=>{
+    if(THREAD_INDEX[tid] && THREAD_INDEX[tid].boardId===id){ delete THREAD_INDEX[tid]; delete LIVE_POSTS[tid]; }
+  });
+  purgeThreadDataForBoard(id);
+  savePersist();
+  applyCustomBoards();
+  /* 削除した板のスレ一覧・スレ本文を今まさに見ていた場合は、存在しない板を
+     参照し続けてクラッシュしないよう、安全にホーム画面へ戻す */
+  if(STATE.boardId===id && (STATE.view==='threads' || STATE.view==='res')){
+    navigate('boards', {boardId:null, threadId:null});
+  }
+  toast(`「${removed.name}」を削除しました`);
+}
+
+async function proxyFetchText(url){
+  const proxied = CORS_PROXY + encodeURIComponent(url);
+  const res = await fetch(proxied);
+  if(!res.ok) throw new Error('プロキシ経由の取得に失敗しました: HTTP ' + res.status);
+  const data = await res.json();
+  if(!data || typeof data.contents !== 'string') throw new Error('プロキシからの応答が不正です');
+  return data.contents;
+}
+function decodeEntities(s){
+  return String(s)
+    .replace(/&lt;/g,'<').replace(/&gt;/g,'>').replace(/&quot;/g,'"').replace(/&#39;/g,"'")
+    .replace(/&amp;/g,'&');
+}
+function stripTags(s){ return String(s).replace(/<[^>]*>/g,''); }
+function cleanText(s){ return decodeEntities(stripTags(String(s||'').trim())); }
+function cleanBody(s){
+  let t = String(s||'');
+  t = t.replace(/<br\s*\/?>/gi, '\n');
+  t = t.replace(/<a\b[^>]*>([\s\S]*?)<\/a>/gi, '$1');
+  t = t.replace(/<[^>]+>/g, '');
+  t = decodeEntities(t);
+  return t.trim();
+}
+function parseSubjectTxt(text, boardId, map){
+  const threads = [];
+  text.split('\n').forEach(rawLine=>{
+    const line = rawLine.replace(/\r$/,'').trim();
+    if(!line) return;
+    const m = line.match(/^(\d+)\.dat<>(.*)\s\((\d+)\)$/);
+    if(!m) return;
+    const key = m[1];
+    threads.push({
+      id: `${boardId}-${key}`,
+      title: cleanText(m[2]),
+      res: parseInt(m[3],10) || 0,
+      createdAt: parseInt(key,10) * 1000,
+      boardId, live:true, server:map.server, boardKey:map.key, threadKey:key,
+    });
+  });
+  return threads;
+}
+function parseDat(text){
+  const posts = [];
+  let num = 0;
+  let title = '';
+  text.split('\n').forEach(rawLine=>{
+    const line = rawLine.replace(/\r$/,'');
+    if(!line.trim()) return;
+    const parts = line.split('<>');
+    if(parts.length < 4) return;
+    num++;
+    const [nameRaw, , dateIdRaw, bodyRaw, titleRaw] = parts;
+    const idm = String(dateIdRaw).match(/ID:([^\s<]+)/);
+    const id = idm ? ('ID:' + idm[1]) : 'ID:???';
+    const date = cleanText(String(dateIdRaw).replace(/\s*ID:\S+/, ''));
+    if(num===1 && titleRaw && titleRaw.trim()) title = cleanText(titleRaw);
+    posts.push({ num, name: cleanText(nameRaw) || '名無しさん', date, id, body: cleanBody(bodyRaw) });
+  });
+  return { posts, title };
+}
+function resolveLiveThread(threadId){
+  if(!threadId) return null;
+  let t = THREAD_INDEX[threadId];
+  if(t && t.live) return t;
+  const idx = threadId.indexOf('-');
+  if(idx < 0) return t || null;
+  const boardId = threadId.slice(0, idx);
+  const threadKey = threadId.slice(idx + 1);
+  const map = OPEN2CH_BOARDS[boardId];
+  if(!map) return t || null;
+  /* v2.10.0バグ修正: 板IDがOPEN2CH_BOARDSに含まれるだけで即live化すると、
+     「anime-1」のようなダミーデータのスレ（threadKeyが"1"のような小さい連番）まで
+     実データと誤判定し、おーぷん2chへ無駄な404通信を飛ばしてしまう。
+     open2chのdatキーは秒単位UNIXタイムスタンプ（9〜10桁の数字）のため、
+     threadKeyがその形式（9桁以上の純粋な数字）である場合のみ実データ化する。 */
+  if(!/^\d{9,}$/.test(threadKey)) return t || null;
+  t = t || {};
+  t.id = threadId;
+  t.boardId = boardId;
+  t.title = t.title || '(読み込み中...)';
+  t.res = t.res || 0;
+  t.createdAt = t.createdAt || (parseInt(threadKey, 10) * 1000 || Date.now());
+  t.live = true;
+  t.server = map.server;
+  t.boardKey = map.key;
+  t.threadKey = threadKey;
+  THREAD_INDEX[threadId] = t;
+  
+  /* v2.2.0: threadCache へも保存 */
+  if(!persist.threadCache) persist.threadCache = {};
+  persist.threadCache[threadId] = { title: t.title, res: t.res };
+  
+  return t;
+}
+/* v3.4.0: プロアクティブ・デバッグ対応 - 単純なshow/hideの出し入れだと、
+   2つの非同期処理（例:通常のスレ読み込みと、投稿後のバックグラウンド確認）が
+   同時に走った際、片方が先に完了してhideLoading()すると、まだ処理中の
+   もう片方の分までローディング表示が消えてしまう。参照カウント方式にして
+   「全ての処理が完了したときだけ」オーバーレイを隠すようにする。 */
+let loadingRefCount = 0;
+function showLoading(){
+  loadingRefCount++;
+  $('#loadingOverlay')?.classList.add('show');
+}
+function hideLoading(){
+  loadingRefCount = Math.max(0, loadingRefCount - 1);
+  if(loadingRefCount === 0){
+    $('#loadingOverlay')?.classList.remove('show');
+  }
+}
+async function ensureLiveThreads(boardId, force){
+  const map = OPEN2CH_BOARDS[boardId];
+  if(!map) return;
+  if(!force && THREADS[boardId] && THREADS[boardId].length && THREADS[boardId][0].live) return;
+  showLoading();
+  try{
+    const text = await proxyFetchText(`https://${map.server}/${map.key}/subject.txt`);
+    const threads = parseSubjectTxt(text, boardId, map);
+    if(threads.length){
+      THREADS[boardId] = threads;
+      threads.forEach(t=>{ THREAD_INDEX[t.id]=t; });
+    } else {
+      toast('スレッド一覧を取得できませんでした（応答が空でした）');
+    }
+  }catch(err){
+    toast('スレッド一覧の取得に失敗しました。通信環境をご確認ください');
+  }finally{
+    hideLoading();
+  }
+}
+async function ensureLivePosts(threadId, force, silent){
+  let t = THREAD_INDEX[threadId];
+  if(!t || !t.live) t = resolveLiveThread(threadId);
+  if(!t || !t.live) return;
+  if(!force && LIVE_POSTS[threadId]) return;
+  /* v3.0.0バグ修正: 新しい取得を開始した時点で、前回の失敗フラグを即座にリセットする。
+     （実際の画面チラつき対策の本体は navigate() 側にもあるが、
+     ensureLivePosts 単体を force 再実行するケースでも一貫して倒しておく） */
+  t.error = false;
+  /* v3.4.0: 投稿後のバックグラウンド確認など「静かに」取得したいケース向けに、
+     silent=true のときは全画面ローディングオーバーレイを出さない */
+  if(!silent) showLoading();
+  try{
+    const text = await proxyFetchText(`https://${t.server}/${t.boardKey}/dat/${t.threadKey}.dat`);
+    const { posts, title } = parseDat(text);
+    LIVE_POSTS[threadId] = posts;
+    t.error = false;
+    if(posts.length) t.res = posts.length;
+    else toast('レスを取得できませんでした（応答が空でした）');
+    if(title && (!t.title || t.title === '(読み込み中...)')) t.title = title;
+    
+    /* v2.2.0: threadCache にも保存 */
+    if(!persist.threadCache) persist.threadCache = {};
+    persist.threadCache[threadId] = { title: t.title, res: t.res };
+    savePersist();
+  }catch(err){
+    /* v2.10.0バグ修正: 通信失敗時に LIVE_POSTS[threadId] を空配列で埋めてしまうと、
+       renderRes側が「0件のスレ（過疎スレ）」と誤判定して「レスがありません」と
+       表示してしまう。空配列は入れず、スレッドオブジェクトにエラーフラグだけを立てて
+       renderRes側でエラーUI（再読み込みボタン）を出し分けられるようにする。
+       すでに取得済みのレスがある場合はそのまま残し、古いデータとして閲覧を継続できる。
+       v3.4.0: silent=true（投稿後のバックグラウンド確認）での失敗は、ユーザーが
+       操作していない裏側の一時的な確認に過ぎないため、エラーフラグは立てず
+       トーストも出さない（次に普通にスレを開いたとき誤って「取得失敗」画面が
+       出るのを防ぐ）。 */
+    if(!silent){
+      t.error = true;
+      toast('レスの取得に失敗しました。通信環境をご確認ください');
+    }
+  }finally{
+    if(!silent) hideLoading();
+  }
+}
+
+/* v2.2.0: お気に入りスレの一括新着チェック（Promise.all で並列処理に高速化） */
+async function checkFavoritesNewArrivals(){
+  showLoading();
+  try{
+    /* Promise.all で全お気に入りスレのHTTP通信を同時開始 */
+    const promises = persist.favorites.map(async (id) => {
+      try{
+        let t = THREAD_INDEX[id];
+        if(!t || !t.live) t = resolveLiveThread(id);
+        if(!t || !t.live) return; /* ダミーデータのスレはチェック対象外 */
+        const text = await proxyFetchText(`https://${t.server}/${t.boardKey}/dat/${t.threadKey}.dat`);
+        const { posts, title } = parseDat(text);
+        if(posts.length){
+          LIVE_POSTS[id] = posts;
+          t.res = posts.length; /* 最新の総レス数で上書き */
+        }
+        t.error = false;
+        if(title && (!t.title || t.title === '(読み込み中...)')) t.title = title;
+        
+        /* v2.2.0: threadCache にも保存 */
+        if(!persist.threadCache) persist.threadCache = {};
+        persist.threadCache[id] = { title: t.title, res: t.res };
+      }catch(err){
+        /* v2.10.0: このスレの取得に失敗しても、他のお気に入りのチェックは継続する。
+           失敗時はエラーフラグだけ立て、既存のLIVE_POSTSは上書きしない */
+        const t = THREAD_INDEX[id];
+        if(t) t.error = true;
+      }
+    });
+    await Promise.all(promises);
+    savePersist(); /* 全checkが完了後、まとめて永続化 */
+  }finally{
+    hideLoading();
+  }
+  if(STATE.view==='boards') renderBoards($('#main'));
+  /* v2.6.0バグ修正: 一括チェック完了直後、下部タブバーの「お気に入り」未読合計バッジも
+     現在の画面に関わらず必ず最新件数へ再計算・更新する */
+  updateHomeTabBadges();
+  toast('お気に入りの更新が完了しました');
+}
+
+/* v2.9.0: ホーム画面「全ての板」の一括新着スレ数更新（Promise.all で全LIVE板を並列取得） */
+async function refreshAllBoardsSubjectCounts(){
+  showLoading();
+  try{
+    const boardIds = Object.keys(OPEN2CH_BOARDS);
+    const promises = boardIds.map(async (boardId)=>{
+      try{
+        const map = OPEN2CH_BOARDS[boardId];
+        const text = await proxyFetchText(`https://${map.server}/${map.key}/subject.txt`);
+        const threads = parseSubjectTxt(text, boardId, map);
+        if(threads.length){
+          THREADS[boardId] = threads;
+          threads.forEach(t=>{ THREAD_INDEX[t.id]=t; });
+        }
+      }catch(err){
+        /* この板の取得に失敗しても、他の板の更新は継続する */
+      }
+    });
+    await Promise.all(promises);
+  }finally{
+    hideLoading();
+  }
+  if(STATE.view==='boards') renderBoards($('#main'));
+  toast('板情報の更新が完了しました');
+}
+
+async function prepareViewData(){
+  if(STATE.view==='threads' && STATE.boardId){
+    await ensureLiveThreads(STATE.boardId);
+  } else if(STATE.view==='res' && STATE.threadId){
+    await ensureLivePosts(STATE.threadId);
+  }
+}
+
+/* ---------- persistence ---------- */
+let persist = null;
+function defaultPersist(){
+  return {
+    version:VERSION,
+    nav:{view:'boards', boardId:null, threadId:null},
+    favorites:['anime-1'],
+    read:{ 'newsplus-2':560, 'anime-1':820, 'livejupiter-2':730, 'prog-1':480 },
+    localPosts:{},
+    theme:'light',
+    ngIds:[],
+    history:[],
+    /* v2.2.0: threadCache を追加 - スレタイトルと最新レス数を永続化 */
+    threadCache:{},
+    /* v2.3.0: draft を追加 - 書き込みフォームの下書きをスレッドごとにリアルタイム永続化 */
+    draft:{},
+    /* v2.4.0: favBoards を追加 - お気に入り登録された板のID配列 */
+    favBoards:['anime'],
+    /* v2.5.0: homeTab を追加 - ホーム画面の下部タブの選択状態 */
+    homeTab:'fav',
+    /* v3.5.0: scrollPositions を追加 - スレッドごとの既読スクロール位置(scrollTop)を記憶し、
+       再入場時に前回読んでいた位置へ自動復元するために使う */
+    scrollPositions:{},
+    /* v3.6.0: ngWords を追加 - 本文（body）を対象としたNGフィルタ。
+       通常は部分一致の文字列、"/pattern/flags" の形式であれば正規表現として扱う */
+    ngWords:[],
+    /* v4.4.0: customBoards を追加 - ユーザーが自由に追加したおーぷん2chの板。
+       各要素は {id, name, server, key, color, addedAt} の形。
+       idはBOARDSの他の板と重複しない板キー（＝OPEN2CH_BOARDSのキーにも使う）。 */
+    customBoards:[]
+  };
+}
+/* v4.5.0: カスタム板IDの後方互換マイグレーション。
+   v4.4.0まではカスタム板の内部ID(cb.id)が単なる板キー(cb.key)そのものだった。
+   新形式（buildCustomBoardId(server,key)）は必ず「サーバー名_キー」という
+   アンダースコア結合の文字列になり、cb.key単体と完全一致することはあり得ない
+   ため、「cb.id === cb.key」という特徴だけで安全に旧形式のエントリを判別できる。
+   旧IDをそのまま参照している既存のスレッドID（"旧ID-スレキー"形式）や
+   favBoards内の板ID参照も、新IDへ書き換えて追従させることで、
+   バックアップのインポートやアップデート後の初回起動でユーザーの
+   お気に入り・既読・下書きなどのデータが失われないようにする。
+   v4.7.0: read/scrollPositions/draft/threadCache/localPosts の書き換えを、
+   従来の「新しいオブジェクトを作って丸ごと差し替える」方式から、既存の
+   オブジェクトに対して新キーを追加してから旧キーをdeleteする方式に変更した。
+   結果として保持されるデータは従来と完全に同一（新旧が二重に残ることはない）
+   だが、変換元の旧ID形式キーをその場でdeleteする、という処理の意図が
+   コード上も明示的になり、「ストレージ内に新旧のデータが重複して残らない」
+   ことを一目で確認できるようにしている。
+   戻り値: 実際に旧形式から新形式への移行が1件以上発生した場合はtrue。
+   呼び出し側（loadPersist経由のinit()）はこれを見て、移行済みのクリーンな
+   状態を早いタイミングでlocalStorageへ書き戻すきっかけに使う。 */
+function migrateCustomBoardIds(o){
+  if(!Array.isArray(o.customBoards) || !o.customBoards.length) return false;
+  const idMap = {}; /* oldId -> newId */
+  o.customBoards = o.customBoards.map(cb=>{
+    if(cb && cb.id === cb.key && cb.server){
+      const newId = buildCustomBoardId(cb.server, cb.key);
+      if(newId !== cb.id) idMap[cb.id] = newId;
+      return Object.assign({}, cb, { id: newId });
+    }
+    return cb;
+  });
+  const oldIds = Object.keys(idMap);
+  if(!oldIds.length) return false;
+  /* threadIdは "boardId-threadKey" の形。旧boardIdはハイフンを含まないことが
+     保証されているため、「旧ID + '-'」で始まるかどうかで安全に判定できる。 */
+  const rewriteThreadId = (tid)=>{
+    if(typeof tid !== 'string') return tid;
+    for(const oldId of oldIds){
+      if(tid.indexOf(oldId + '-') === 0) return idMap[oldId] + tid.slice(oldId.length);
+    }
+    return tid;
+  };
+  if(Array.isArray(o.favorites)) o.favorites = o.favorites.map(rewriteThreadId);
+  if(Array.isArray(o.history)) o.history = o.history.map(rewriteThreadId);
+  /* favBoardsは板IDそのものの配列（threadIdではない）なので、直接置換する */
+  if(Array.isArray(o.favBoards)) o.favBoards = o.favBoards.map(id=> idMap[id] || id);
+  ['read','scrollPositions','draft','threadCache','localPosts'].forEach(key=>{
+    const store = o[key];
+    if(store && typeof store==='object' && !Array.isArray(store)){
+      /* Object.keys()はループ開始時点のキー一覧をスナップショットするため、
+         ループ内でstoreへキーを追加・削除しても走査対象がブレることはない */
+      Object.keys(store).forEach(tid=>{
+        const newTid = rewriteThreadId(tid);
+        if(newTid !== tid){
+          store[newTid] = store[tid];
+          /* v4.7.0: 変換元となった旧ID形式のキーをここで明示的に削除し、
+             新旧のデータがストレージ内に重複して残らないようにする */
+          delete store[tid];
+        }
+      });
+    }
+  });
+  return true;
+}
+/* v4.7.0: ensureShape()内でカスタム板IDの旧→新形式マイグレーションが実際に
+   発生したかどうかを記録しておくフラグ。init()側でこれを見て、できるだけ早い
+   タイミングでクリーンアップ済みの状態をlocalStorageへ書き戻すために使う
+   （書き戻しが遅れるほど、旧ID形式の生データがストレージに残り続ける期間が
+   長引いてしまうため）。 */
+let _customBoardIdMigrationOccurred = false;
+function ensureShape(o){
+  o = (o && typeof o==='object') ? o : {};
+  if(!o.nav || typeof o.nav!=='object') o.nav={view:'boards',boardId:null,threadId:null};
+  if(!Array.isArray(o.favorites)) o.favorites=[];
+  if(!o.read || typeof o.read!=='object') o.read={};
+  if(!o.localPosts || typeof o.localPosts!=='object') o.localPosts={};
+  if(o.theme!=='light' && o.theme!=='dark') o.theme='light';
+  if(!Array.isArray(o.ngIds)) o.ngIds=[];
+  if(!Array.isArray(o.history)) o.history=[];
+  /* v2.2.0: threadCache の初期化 */
+  if(!o.threadCache || typeof o.threadCache!=='object') o.threadCache={};
+  /* v2.3.0: draft の初期化 */
+  if(!o.draft || typeof o.draft!=='object') o.draft={};
+  /* v2.4.0: favBoards の初期化 */
+  if(!Array.isArray(o.favBoards)) o.favBoards=['anime'];
+  /* v2.5.0: homeTab の初期化 */
+  if(o.homeTab!=='boards' && o.homeTab!=='fav' && o.homeTab!=='history') o.homeTab='fav';
+  /* v3.5.0: scrollPositions の初期化（旧バージョンのデータをインポートした場合に備える） */
+  if(!o.scrollPositions || typeof o.scrollPositions!=='object') o.scrollPositions={};
+  /* v3.6.0: ngWords の初期化（旧バージョンのデータをインポートした場合に備える） */
+  if(!Array.isArray(o.ngWords)) o.ngWords=[];
+  /* v4.4.0: customBoards の初期化。旧バージョンのデータや手編集されたJSONの
+     インポートに備え、id/server/keyのいずれかが欠けている壊れたエントリは
+     ここで確実にふるい落とし、後段のapplyCustomBoards()がクラッシュしないようにする。 */
+  if(!Array.isArray(o.customBoards)) o.customBoards=[];
+  else o.customBoards = o.customBoards.filter(cb=>
+    cb && typeof cb==='object' && typeof cb.id==='string' && cb.id.trim()
+    && typeof cb.server==='string' && cb.server.trim()
+    && typeof cb.key==='string' && cb.key.trim()
+  );
+  /* v4.5.0: 旧ID形式（v4.4.0まではcb.idが単なるkeyだった）から、サーバー名を
+     合成したユニークID形式への移行、およびそれに伴うお気に入り/履歴/既読/
+     下書き/スクロール位置/お気に入り板など、boardId・threadIdをキーに持つ
+     永続化データ全ての一括書き換えを行う。旧データが残っていても、
+     インポートされても、クラッシュせず自動的に新形式へ揃えられる。 */
+  const migrated = migrateCustomBoardIds(o);
+  /* v4.7.0: 実際に移行が発生した場合だけフラグを立てる（毎回無条件で立てると
+     移行不要なケースでも余計なsavePersist()を早期に走らせてしまうため） */
+  if(migrated) _customBoardIdMigrationOccurred = true;
+  /* 移行や手編集されたJSONの結果、万が一IDが重複するエントリが残っていた場合の
+     最終防衛（先に現れた方を正として残し、後続の重複は捨てる） */
+  { const seenIds=new Set(); o.customBoards = o.customBoards.filter(cb=>{ if(seenIds.has(cb.id)) return false; seenIds.add(cb.id); return true; }); }
+  o.version = VERSION;
+  return o;
+}
+function loadPersist(){
+  try{ const raw=localStorage.getItem(LS_KEY); persist = raw?ensureShape(JSON.parse(raw)):defaultPersist(); }
+  catch(e){ persist=defaultPersist(); }
+}
+/* v4.7.0バグ修正: 従来はここが loadPersist() の内部に直書きされており、
+   「THREAD_INDEX[threadId] が既に存在する場合だけキャッシュを上書きする」という
+   条件になっていた。しかし起動直後の THREAD_INDEX には静的なダミースレしか
+   入っておらず、実データ（デフォルトのLIVE板・カスタム板いずれも）のスレは
+   1件も入っていない。そのため、お気に入りや履歴に入っている実データスレの
+   タイトル・レス数が復元されず、一覧を開いた瞬間に軒並み「(読み込み中...)」に
+   化けてしまう致命的なバグがあった。
+   ここでは、THREAD_INDEXにまだ存在しないスレIDについては resolveLiveThread() で
+   （板ID・スレキーの形式からOPEN2CH_BOARDS経由で）まずプレースホルダを構築して
+   から、その上にキャッシュされていたタイトル・レス数を上書きする。
+   resolveLiveThread()はデフォルトの実データ板・カスタム板のどちらにも対応して
+   おり、静的なダミースレや解決できないIDに対しては安全にnullを返すだけなので、
+   該当エントリはそのままスキップされクラッシュしない。
+   【重要な前提】この関数はOPEN2CH_BOARDSにカスタム板のマッピングが反映済み、
+   すなわち applyCustomBoards() の実行後に呼ぶこと（init()・importData()の
+   両方で、この順序を厳守している）。 */
+function restoreThreadCacheIntoIndex(){
+  if(!persist.threadCache || typeof persist.threadCache !== 'object') return;
+  Object.entries(persist.threadCache).forEach(([threadId, cache])=>{
+    if(!cache || typeof cache !== 'object') return;
+    let t = THREAD_INDEX[threadId];
+    if(!t) t = resolveLiveThread(threadId);
+    if(!t) return; /* 静的ダミースレでもなく実データとしても解決できないIDは復元不要 */
+    if(cache.title) t.title = cache.title;
+    if(cache.res) t.res = cache.res;
+    /* v4.7.0バグ修正: resolveLiveThread()は新規にプレースホルダを構築する際、
+       その時点の（まだ上のcache.title/cache.resで上書きする前の）暫定タイトル
+       '(読み込み中...)' で persist.threadCache[threadId] を一旦上書きしてしまう
+       副作用を持つ。ここで確定した正しい値へ threadCache 側も必ず同期し直して
+       おかないと、この暫定上書きがそのままlocalStorageへ保存されてしまい、
+       次回起動時に再び「(読み込み中...)化け」が再発してしまう。 */
+    persist.threadCache[threadId] = { title: t.title, res: t.res };
+  });
+}
+function savePersist(){
+  persist.nav = {view:STATE.view, boardId:STATE.boardId, threadId:STATE.threadId};
+  try{ localStorage.setItem(LS_KEY, JSON.stringify(persist)); }catch(e){}
+}
+const HISTORY_MAX = 20;
+function addHistory(threadId){
+  const i = persist.history.indexOf(threadId);
+  if(i>=0) persist.history.splice(i,1);
+  persist.history.unshift(threadId);
+  if(persist.history.length>HISTORY_MAX) persist.history.length = HISTORY_MAX;
+}
+
+/* ---------- post access ---------- */
+/* v3.2.0バグ修正:「60分経過後の二重表示バグ」対策
+   v3.1.0では「本文一致マージ」の対象を直近60分以内のローカル投稿だけに限定して
+   いたため、書き込みから60分を過ぎるとマージ判定自体が行われなくなり、
+   サーバーに反映済みのはずのローカル擬似レスがそのまま残って二重表示されていた。
+
+   本文一致という判定基準自体は「自分の書き込みが実際にサーバーへ反映された」
+   ことの十分な証拠なので、時間による足切りは不要（かつ有害）と判断し撤廃する。
+   一方で、サーバーに弾かれて永久に反映されないローカル投稿がストレージに
+   残り続けるのを防ぐため、書き込みから24時間以上経過したものは、本文一致の
+   有無に関わらず「反映されなかった記録」として自動的に片付ける。 */
+const LOCAL_POST_EXPIRE_MS = 24*60*60*1000; /* 24時間 */
+function normalizeBodyForMatch(body){
+  return String(body||'').replace(/\s+/g,'').trim();
+}
+function pruneStaleLocalPosts(threadId){
+  const loc = persist.localPosts[threadId];
+  if(!loc || !loc.length) return;
+  const t = THREAD_INDEX[threadId];
+  /* v3.4.0バグ修正:「ダミースレでの本文一致誤消去バグ」対策
+     本文一致マージは「実際にサーバーへ送信を試みたLIVEスレ（実データスレ）」に
+     対してのみ意味を持つ処理であり、ダミースレにはそもそも比較対象となる
+     "サーバー"が存在しない。
+     v3.3.0時点のガード（isLiveWithoutRealData）はLIVEスレのみを対象にしていた
+     ため、ダミースレ（t.live が無い通常のアニメ板など）では常に basePosts()
+     （ランダム生成されるダミーレス）との本文一致チェックが素通しで実行されて
+     いた。ダミーレスの中に「それな」「わかる」等ありふれた一言が偶然含まれて
+     いると、自分のローカル投稿がそれと衝突し「反映済み」と誤認されて誤って
+     永久削除されてしまう。
+     そこで判定を「t.live が真かつ実データ(LIVE_POSTS)が手元にある場合のみ
+     本文一致マージを行う」に統一する。ダミースレ・実データ未取得のLIVEスレの
+     どちらでも本文一致判定は一切行わず、24時間経過による期限切れクリーンアップ
+     だけを安全に実行する。 */
+  const isLive = !!(t && t.live);
+  const hasRealData = isLive && !!LIVE_POSTS[threadId];
+  const baseBodies = hasRealData
+    ? new Set(basePosts(threadId).map(p=>normalizeBodyForMatch(p.body)))
+    : null;
+  const now = Date.now();
+  const pruned = loc.filter(p=>{
+    if(p.id !== 'ID:local') return true; /* ローカル発でないものは対象外（保険） */
+    /* LIVEスレかつ実データが手元にある場合のみ、本文一致でのマージ判定を行う */
+    if(baseBodies && baseBodies.has(normalizeBodyForMatch(p.body))) return false;
+    /* 反映確認の有無に関わらず、24時間経過した投稿はダミースレ・LIVEスレ
+       どちらでも安全に片付ける（ストレージ肥大化・古い記録の防止） */
+    if(p.ts && (now - p.ts) > LOCAL_POST_EXPIRE_MS) return false;
+    return true;
+  });
+  if(pruned.length !== loc.length){
+    persist.localPosts[threadId] = pruned;
+    savePersist();
+  }
+}
+function getPosts(threadId){
+  pruneStaleLocalPosts(threadId);
+  const base = basePosts(threadId);
+  const loc = persist.localPosts[threadId] || [];
+  /* v3.1.0バグ修正: ローカル擬似レスは、サーバー側の総レス数がいくつであっても
+     「常にベースの実データの一番後ろ」に安全に結合する。num はベースの最後の
+     番号を基準にローカル分だけ振り直し、サーバー実レスの num を絶対に
+     上書き・衝突させない。 */
+  const baseMaxNum = base.reduce((m,p)=>Math.max(m, p.num||0), 0);
+  const locNumbered = loc.map((p,i)=>({ ...p, num: baseMaxNum + i + 1 }));
+  return base.concat(locNumbered);
+}
+function totalRes(threadId){
+  /* v3.1.0: 一覧画面などで多数のスレに対して呼ばれても軽く済むよう、
+     getPosts()のフル結合(concat/map)は使わず、件数だけを軽量に計算する。
+     ローカル擬似レスのマージ判定（pruneStaleLocalPosts）だけは正しさのため必ず通す。 */
+  pruneStaleLocalPosts(threadId);
+  const t = THREAD_INDEX[threadId];
+  const baseTotal = (t && typeof t.res==='number') ? t.res : basePosts(threadId).length;
+  return baseTotal + (persist.localPosts[threadId]?.length || 0);
+}
+function renderFavCountBadge(threadId){
+  const total = totalRes(threadId);
+  const read = persist.read[threadId] || 0;
+  if(total > read){
+    return `<span class="pill new fb">+${total-read}</span>`;
+  }
+  return `<span class="fb">${total}</span>`;
+}
+
+/* ---------- state / navigation (History API) ---------- */
+let STATE = {view:'boards', boardId:null, threadId:null};
+const popupStack = [];
+/* v2.9.0: ポップアップの再描画関数をスタックと並行して保持する。
+   NG登録/解除など、開いたままのポップアップの中身に影響する操作が行われた際、
+   ポップアップを閉じずにその場で表示を更新するために使う。 */
+const popupRefreshers = [];
+function refreshOpenPopups(){ popupRefreshers.forEach(fn=>{ try{ fn(); }catch(e){} }); }
+/* ---------- v3.9.0: 多層（ネスト）ポップアップ表示 ----------
+   アンカー(>>5)ポップアップの本文の中からさらに別のアンカーをタップした場合など、
+   既存のポップアップを消さずに、その上に新しいポップアップを重ねて表示できるようにする。
+   ・重なりの深さ(depth)に応じて右下へ少しずつずらし、下のポップアップの端が覗くようにする
+     ことで、Chmate風の「積み重なっている」見た目を表現する。
+   ・ずらし幅は POPUP_CASCADE_MAX_DEPTH 段目以降は増やさず、画面外へはみ出さないようにする。
+   ・連続でアンカーを連打されてもスタックが際限なく増え続けないよう、
+     MAX_POPUP_STACK を超えたら新規オープンそのものを止めてトーストで知らせる
+     （既存のポップアップやアプリの状態を壊さないための安全弁）。
+   ・すべてのポップアップ生成箇所（ID/アンカー/返信/画像一覧/NG管理）はこの関数を
+     経由するよう統一し、挙動やスタイル適用漏れが起きないようにする。 */
+const MAX_POPUP_STACK = 6;
+const POPUP_CASCADE_STEP = 14;
+const POPUP_CASCADE_MAX_DEPTH = 4;
+function registerPopup(el, refreshFn){
+  if(!el) return false;
+  if(popupStack.length >= MAX_POPUP_STACK){
+    toast('これ以上ポップアップを重ねて開けません');
+    return false;
+  }
+  const depth = popupStack.length; /* 0段目=最初のポップアップ */
+  const cascadeDepth = Math.min(depth, POPUP_CASCADE_MAX_DEPTH);
+  const offset = cascadeDepth * POPUP_CASCADE_STEP;
+  try{
+    /* .popup 基本CSSの transform:translate(-50%,-50%) を維持しつつ、段数分だけ右下へずらす。
+       calc()を使うことで、中央寄せの基準はそのままに追加オフセットだけを重ねられる。 */
+    el.style.transform = `translate(calc(-50% + ${offset}px), calc(-50% + ${offset}px))`;
+    el.style.zIndex = String(100 + depth);
+  }catch(e){ /* スタイル適用に失敗しても表示自体は継続させる（見た目が重なるだけで機能は保つ） */ }
+  $('#popupLayer').append(el);
+  popupStack.push(el);
+  popupRefreshers.push(typeof refreshFn==='function' ? refreshFn : (()=>{}));
+  $('#scrim').classList.add('show'); $('#popupLayer').classList.add('show');
+  return true;
+}
+/* v2.6.0バグ修正: ホーム画面から他画面へ移動する直前のスクロール位置を保持し、
+   「戻る」でホーム画面に復帰した際に元の閲覧位置を復元できるようにする */
+let homeScrollTop = 0;
+
+/* ---------- v3.5.0: スレッドごとの既読スクロール位置の記憶と復元 ----------
+   仕様:
+   ・#main をスクロールするたびに persist.scrollPositions[threadId] へ現在の scrollTop を
+     デバウンス保存する（1文字ごとにlocalStorageへ書き込むとプチフリの原因になるため、
+     下書き保存(v2.10.0)と同じ設計思想でまとめて書き込む）。
+   ・「navigate()/popstate/起動時」など“そのスレへ新規に入場した”タイミングだけ
+     pendingScrollRestore に印を付け、renderRes() が実データを描画し終えた直後に
+     一度だけ復元スクロールを行う。
+   ・thread-refresh や投稿後の再描画（renderRes単体呼び出し）では印が付かないため、
+     ユーザーが今見ている位置を通信の裏で勝手に移動させてしまう事故を防ぐ。
+   ・非同期のデータ読み込みが完了する前（ローディング/エラー表示中）は renderRes が
+     早期returnする分岐を通るため、印を消費せずそのまま次回の描画まで保持する
+     （＝データ未着のタイミングでズレたスクロールをしてしまう競合を回避）。 */
+let pendingScrollRestore = {};
+/* ---------- v4.0.0: 「【主】のみ」レス抽出表示モード ----------
+   スレッドごとにON/OFFを覚えておきたいため、単純なグローバルbooleanではなく
+   threadIdをキーにしたオブジェクトで保持する（他のper-thread状態と同じ設計）。
+   opId（>>1のID）がまだ確定していない（実データ未着）段階でこのモードがONでも、
+   renderRes側で opId が falsy のときはフィルタを適用せず全レス表示にフォールバックする
+   ため、クラッシュしたり画面が真っ白になったりすることはない。 */
+let nushiOnlyByThread = {};
+let scrollPosSaveTimer = null;
+function scheduleScrollPosSave(){
+  if(STATE.view!=='res' || !STATE.threadId) return;
+  const tid = STATE.threadId;
+  clearTimeout(scrollPosSaveTimer);
+  scrollPosSaveTimer = setTimeout(()=>{
+    scrollPosSaveTimer = null;
+    if(!persist.scrollPositions) persist.scrollPositions={};
+    persist.scrollPositions[tid] = $('#main').scrollTop;
+    savePersist();
+  }, 400);
+}
+function flushScrollPosSave(){
+  if(!scrollPosSaveTimer) return;
+  clearTimeout(scrollPosSaveTimer);
+  scrollPosSaveTimer = null;
+  if(STATE.view==='res' && STATE.threadId){
+    if(!persist.scrollPositions) persist.scrollPositions={};
+    persist.scrollPositions[STATE.threadId] = $('#main').scrollTop;
+    savePersist();
+  }
+}
+/* ---------- v3.9.0: 自動スクロール中の新着通知誤消去ガード ----------
+   restoreScrollPositionIfPending() がスレ入場時に前回位置へ自動でスクロールさせる際、
+   その書き換えを #main のscrollイベントリスナーが「ユーザーが最下部まで手動スクロールした」
+   と誤認し、たまたま表示されていた新着通知バッジ(newArrivalNotice)を不発で消してしまう
+   ことがある。isAutoScrolling が true の間だけ、scrollイベント内の「最下部到達→通知を消す」
+   判定をスキップさせることで、この誤消去を確実に防ぐ。
+   （新着通知バッジ自体をタップした際のスクロール(smoothScrollThreadBottom)は、逆に
+   最下部到達で通知が消えることを期待する処理のため、ここでは意図的にガードしない） */
+let isAutoScrolling = false;
+let autoScrollGuardTimer = null;
+function withAutoScrollGuard(fn){
+  isAutoScrolling = true;
+  clearTimeout(autoScrollGuardTimer);
+  try{ fn(); }
+  catch(e){ /* 復元処理自体の例外はここで握りつぶし、ガード解除は必ず行う（下のfinallyに委ねる） */ }
+  finally{
+    /* scrollTopの書き換えからscrollイベント発火までは数フレームのズレが生じ得るため、
+       直後ではなく少し余裕を持たせてガードを解除する */
+    autoScrollGuardTimer = setTimeout(()=>{ isAutoScrolling=false; autoScrollGuardTimer=null; }, 150);
+  }
+}
+/* renderRes() が実データの描画を終えた直後に呼ぶ。復元対象としての印が付いている
+   スレッドだけ、保存済みのスクロール位置へ1フレーム後に復元する。
+   （rAFを二重に挟むのは、innerHTML差し替え直後は scrollHeight が未確定のことがあるため）
+   v3.6.0: 画像の多いスレでは、CSS側で.post-thumbの表示サイズを固定化した上でも
+   読み込みタイミング次第でわずかなレイアウト変化が起こり得るため、画像の読み込み完了
+   （または一定時間のタイムアウト）を待ってから、ユーザーが自分で操作していない場合に限り
+   もう一度スクロール位置を合わせ直す“二段構え”のガードを入れる。 */
+function restoreScrollPositionIfPending(threadId, main){
+  if(!pendingScrollRestore[threadId]) return;
+  delete pendingScrollRestore[threadId];
+  const saved = persist.scrollPositions && persist.scrollPositions[threadId];
+  if(typeof saved!=='number' || saved<=0) return;
+  const stillHere = ()=> STATE.view==='res' && STATE.threadId===threadId;
+  requestAnimationFrame(()=>{
+    requestAnimationFrame(()=>{
+      if(!stillHere()) return;
+      withAutoScrollGuard(()=>{ main.scrollTop = Math.min(saved, main.scrollHeight); });
+      try{
+        const imgs = Array.from(main.querySelectorAll('img'));
+        if(!imgs.length) return;
+        const scrollJustAfterSet = main.scrollTop;
+        const waitOne = img => new Promise(res=>{
+          if(img.complete){ res(); return; }
+          const done = ()=>{ img.removeEventListener('load', done); img.removeEventListener('error', done); res(); };
+          img.addEventListener('load', done);
+          img.addEventListener('error', done);
+        });
+        /* 画像が多い/読み込みが遅いケースで永久に待たされないよう、最大1.5秒でタイムアウトさせる */
+        const timeout = new Promise(res=>setTimeout(res, 1500));
+        Promise.race([Promise.all(imgs.map(waitOne)), timeout]).then(()=>{
+          if(!stillHere()) return;
+          /* この待機の間にユーザー自身が手でスクロールしていた場合は、その操作を尊重して上書きしない
+             （数px程度のブレは「未操作」とみなす） */
+          if(Math.abs(main.scrollTop - scrollJustAfterSet) <= 4){
+            withAutoScrollGuard(()=>{ main.scrollTop = Math.min(saved, main.scrollHeight); });
+          }
+        }).catch(()=>{ /* 画像読み込み監視自体が失敗しても本体機能はクラッシュさせない */ });
+      }catch(e){ /* querySelectorAll等で想定外の例外が出てもスクロール復元自体は既に完了済みなので無視 */ }
+    });
+  });
+}
+
+function normalizeState(){
+  if(STATE.view==='res' && STATE.threadId && !THREAD_INDEX[STATE.threadId]){
+    resolveLiveThread(STATE.threadId);
+  }
+  if(STATE.view==='res' && !THREAD_INDEX[STATE.threadId]){
+    STATE={view:'boards',boardId:null,threadId:null};
+  } else if(STATE.view==='res' && !STATE.boardId){
+    STATE.boardId = THREAD_INDEX[STATE.threadId].boardId;
+  }
+  if(STATE.view==='threads' && !THREADS[STATE.boardId]) STATE={view:'boards',boardId:null,threadId:null};
+}
+function serialize(){ return {view:STATE.view, boardId:STATE.boardId, threadId:STATE.threadId}; }
+async function navigate(view, opt={}){
+  closeResMenu(); closeThreadMenu();
+  /* v3.5.0: 今見ているスレを離れる前に、スクロール位置の保存待ち(デバウンス)を確定させる */
+  flushScrollPosSave();
+  /* v2.6.0バグ修正: ホーム画面を離れる直前のスクロール位置を退避しておく */
+  if(STATE.view==='boards' && view!=='boards'){ homeScrollTop = $('#main').scrollTop; }
+  STATE = {view, boardId: opt.boardId ?? STATE.boardId, threadId: opt.threadId ?? STATE.threadId};
+  /* v3.0.0バグ修正: 通信（ensureLivePosts）が始まる前の最初の renderView() は、
+     まだ再取得を試みていないにもかかわらず「前回失敗した」ままのエラー画面を
+     一瞬描画してしまう（チラつきの本体）。ここで先にエラーフラグを倒しておき、
+     最初の描画では代わりに「読み込み中...」を表示させる。 */
+  if(STATE.view==='res' && STATE.threadId){
+    /* v3.5.0: 今回のnavigate()で新たにスレへ入場したので、renderRes完了後に
+       前回の既読スクロール位置へ復元するよう印を付ける */
+    pendingScrollRestore[STATE.threadId] = true;
+    const rt = THREAD_INDEX[STATE.threadId];
+    if(rt && rt.error) rt.error = false;
+  }
+  history.pushState(serialize(), '');
+  /* v2.3.0: 通信を待たずに先に画面を切り替える（フリーズ感の排除） */
+  renderView(); savePersist();
+  showLoading();
+  try{
+    await prepareViewData();
+  } finally {
+    hideLoading();
+  }
+  /* 通信完了後に最新データで中身を再描画 */
+  renderView(); savePersist();
+}
+function goBack(){
+  if(resMenuOpen){ closeResMenu(); return; }
+  if(threadMenuOpen){ closeThreadMenu(); return; }
+  if(popupStack.length){ closeTopPopup(); return; }
+  history.back();
+}
+window.addEventListener('popstate', async e=>{
+  closeResMenu(); closeThreadMenu();
+  /* v3.5.0: 戻る/進む操作でも、離れる前のスクロール位置の保存待ちを確定させる */
+  flushScrollPosSave();
+  if(popupStack.length){ closeTopPopup(); history.pushState(serialize(),''); return; }
+  /* v2.6.0バグ修正: ホーム画面を離れる遷移であれば、ここでもスクロール位置を退避しておく */
+  const nextView = (e.state && e.state.view) ? e.state.view : 'boards';
+  if(STATE.view==='boards' && nextView!=='boards'){ homeScrollTop = $('#main').scrollTop; }
+  if(e.state && e.state.view){ STATE = {view:e.state.view, boardId:e.state.boardId, threadId:e.state.threadId}; }
+  else { STATE = {view:'boards', boardId:null, threadId:null}; }
+  /* v3.0.0バグ修正: navigate() と同様、戻る/進む操作でスレへ再入場する際も
+     前回失敗時のエラーフラグを先に倒し、チラつきを防ぐ */
+  if(STATE.view==='res' && STATE.threadId){
+    /* v3.5.0: 戻る/進む操作でスレへ（再)入場したので、復元対象として印を付ける */
+    pendingScrollRestore[STATE.threadId] = true;
+    const rt = THREAD_INDEX[STATE.threadId];
+    if(rt && rt.error) rt.error = false;
+  }
+  /* v2.3.0: 戻る操作でも先に画面を切り替えてから通信する */
+  renderView(); savePersist();
+  showLoading();
+  try{
+    await prepareViewData();
+  } finally {
+    hideLoading();
+  }
+  renderView(); savePersist();
+});
+
+/* ---------- render: header ---------- */
+function updateHeader(){
+  const back=$('#backBtn'), title=$('#hdrTitle'), threadMenuBtn=$('#threadMenuBtn');
+  if(STATE.view==='boards'){
+    back.classList.add('hide');
+    title.innerHTML = `5ch ブラウザ <span class="ver">v${VERSION}</span>`;
+  }else{
+    back.classList.remove('hide');
+    if(STATE.view==='threads'){
+      const b=BOARDS.find(x=>x.id===STATE.boardId);
+      title.textContent = b?b.name:'スレッド一覧';
+    }else{
+      const t=THREAD_INDEX[STATE.threadId];
+      title.textContent = t?t.title:'レス';
+    }
+  }
+  /* v2.6.0: スレメニュー（⋮）ボタンは res 画面のときだけ表示する */
+  if(threadMenuBtn) threadMenuBtn.classList.toggle('hide', STATE.view!=='res');
+}
+
+/* ---------- render: dispatch ---------- */
+function renderView(){
+  closeResMenu(); closeThreadMenu();
+  updateHeader();
+  /* v3.7.0: 表示すべき画面/スレッドが新着通知の対象と食い違ったら、古い通知を消す
+     （別スレ・別画面へ移動した後に前のスレの通知が誤って残る事故を防ぐガード） */
+  if(newArrivalNoticeThreadId && !(STATE.view==='res' && STATE.threadId===newArrivalNoticeThreadId)){
+    hideNewArrivalNotice();
+  }
+  const main=$('#main');
+  const compose=$('#composeBar');
+  const fab=$('#fabNav');
+  const homeTab=$('#homeTabBar');
+  compose.classList.remove('show','expanded');
+  main.classList.remove('has-compose','has-hometab');
+  if(fab) fab.classList.remove('fab-hide');
+  if(STATE.view==='boards') renderBoards(main);
+  else if(STATE.view==='threads') renderThreads(main);
+  else if(STATE.view==='res') renderRes(main);
+  if(fab) fab.classList.toggle('show', STATE.view==='res');
+  if(homeTab){
+    const onHome = STATE.view==='boards';
+    homeTab.classList.toggle('show', onHome);
+    if(onHome){ main.classList.add('has-hometab'); updateHomeTabBarActive(); }
+  }
+  /* v2.6.0バグ修正: ホーム画面へ復帰した場合は退避しておいたスクロール位置を復元し、
+     それ以外の画面（スレ一覧・スレ本文など）は従来どおり先頭にリセットする */
+  main.scrollTop = (STATE.view==='boards') ? homeScrollTop : 0;
+}
+
+/* v2.4.0: 板の行1件分のHTMLを生成する共通関数（板一覧・お気に入り板セクションの両方で使用） */
+function renderBoardRow(b){
+  const abbr = b.name.replace(/[（(].*$/,'').slice(0,2);
+  const count = THREADS[b.id]?.length || 0;
+  const liveBadge = OPEN2CH_BOARDS[b.id] ? `<span class="pill live">LIVE</span>` : '';
+  const isFavBoard = persist.favBoards.includes(b.id);
+  /* v4.4.0: カスタム板の行にだけ削除（ゴミ箱）ボタンを追加する */
+  const trashBtn = b.custom
+    ? `<button class="board-trash-btn" data-act="customboard-remove-confirm" data-id="${esc(b.id)}" aria-label="この板を削除">🗑</button>`
+    : '';
+  return `<div class="board-row" data-board="${b.id}">
+    <span class="board-ico" style="background:${b.color}">${esc(abbr)}</span>
+    <span class="board-name">${esc(b.name)}</span>
+    ${liveBadge}
+    <span class="board-count">${count}スレ</span>
+    ${trashBtn}
+    <button class="board-fav-star ${isFavBoard?'on':''}" data-favboard="${b.id}">${isFavBoard?'★':'☆'}</button>
+    <span class="chev">›</span>
+  </div>`;
+}
+
+/* v2.5.0: ホーム画面のヒーローエリア（常に表示） */
+function renderHomeHero(){
+  return `
+    <div class="home-hero">
+      <h1>5ch ブラウザ <span class="ver">v${VERSION}</span></h1>
+      <p>一部の板（LIVE表示）はおーぷん2chの実データ、それ以外はダミーデータです</p>
+    </div>`;
+}
+
+/* v2.5.0: タブ「板一覧」- カテゴリ別の板リスト + お気に入り板セクション */
+function renderHomeTabBoards(){
+  let html = '';
+  const favBoardIds = persist.favBoards.filter(id=> BOARDS.some(b=>b.id===id));
+  if(favBoardIds.length){
+    html += `<div class="section-label">お気に入り板</div><div class="card-group">`;
+    favBoardIds.forEach(id=>{
+      const b = BOARDS.find(x=>x.id===id);
+      html += renderBoardRow(b);
+    });
+    html += `</div>`;
+  }
+  /* v2.9.0: 「全ての板」ラベルの右側に一括新着スレ数更新ボタンを設置 */
+  html += `<div class="section-label">全ての板<button class="fav-check-btn" data-act="boards-refresh-all">🔄 板更新</button></div>`;
+  const cats=[]; BOARDS.forEach(b=>{ if(!cats.includes(b.cat)) cats.push(b.cat); });
+  cats.forEach(cat=>{
+    html += `<div class="section-label">${esc(cat)}</div><div class="card-group">`;
+    BOARDS.filter(b=>b.cat===cat).forEach(b=>{ html += renderBoardRow(b); });
+    html += `</div>`;
+  });
+  /* v4.4.0: 「全ての板」セクションの最下部に、カスタム板の追加・管理へ進む
+     エントリを常設する。カスタム板自体は`cat:'カスタム板'`として上のcatsループで
+     既に自動的に他のカテゴリと同列に表示されているため（BOARDSの末尾に追加される
+     ため一番下のカテゴリになる）、ここではあくまで「追加・管理を開く入口」だけを置く。 */
+  html += `<div class="card-group">
+    <div class="board-row" data-act="customboard-manage-open">
+      <span class="board-ico" style="background:var(--surface-2); color:var(--accent); border:1px dashed var(--accent); font-weight:800;">＋</span>
+      <span class="board-name" style="color:var(--accent); font-weight:700;">カスタム板を追加・管理</span>
+      <span class="chev">›</span>
+    </div>
+  </div>`;
+  return html;
+}
+
+/* v2.5.0: タブ「お気に入り」- お気に入りスレッド一覧 + 一括チェック */
+function renderHomeTabFav(){
+  const favs = persist.favorites.filter(id=> THREAD_INDEX[id] || resolveLiveThread(id));
+  let html = `<div class="section-label">お気に入りスレ<button class="fav-check-btn" data-act="fav-check-all">🔄 一括チェック</button></div>`;
+  if(favs.length){
+    html += `<div class="card-group">`;
+    /* v2.2.0: 未読優先ソート - 新着がある順にソート（新着件数が多い順、その後は登録順） */
+    const sorted = favs.slice().sort((a, b) => {
+      const aTotal = totalRes(a);
+      const bTotal = totalRes(b);
+      const aRead = persist.read[a] || 0;
+      const bRead = persist.read[b] || 0;
+      const aNew = Math.max(0, aTotal - aRead);
+      const bNew = Math.max(0, bTotal - bRead);
+      if(aNew !== bNew) return bNew - aNew;
+      return 0;
+    });
+    sorted.forEach(id=>{
+      const t=THREAD_INDEX[id];
+      /* v3.6.0: お気に入り一覧でも1000レス終了済みのスレをグレーアウトして一目でわかるようにする */
+      const isDatOchi = totalRes(id) >= 1000;
+      html += `<div class="fav-row ${isDatOchi?'datochi-row':''}" data-thread="${id}" data-board="${t.boardId}">
+        <span class="star">★</span>
+        <span class="ft">${esc(t.title)}</span>
+        ${isDatOchi ? '<span class="pill dat">DAT落ち</span>' : ''}
+        ${renderFavCountBadge(id)}
+        <span class="chev">›</span>
+      </div>`;
+    });
+    html += `</div>`;
+  }else{
+    html += `<div class="empty">お気に入りのスレッドはまだありません<br>スレ一覧の☆をタップして登録できます</div>`;
+  }
+  return html;
+}
+
+/* v2.5.0: タブ「履歴」- 閲覧履歴スレッド一覧 */
+function renderHomeTabHistory(){
+  const hist = (persist.history||[]).filter(id=> THREAD_INDEX[id] || resolveLiveThread(id));
+  let html = `<div class="section-label">履歴</div>`;
+  if(hist.length){
+    html += `<div class="card-group">`;
+    hist.forEach(id=>{
+      const t=THREAD_INDEX[id];
+      /* v3.6.0: 履歴一覧でも1000レス終了済みのスレをグレーアウトして一目でわかるようにする */
+      const isDatOchi = totalRes(id) >= 1000;
+      html += `<div class="fav-row ${isDatOchi?'datochi-row':''}" data-thread="${id}" data-board="${t.boardId}">
+        <span class="history-ico">🕒</span>
+        <span class="ft">${esc(t.title)}</span>
+        ${isDatOchi ? '<span class="pill dat">DAT落ち</span>' : ''}
+        <span class="fb">${totalRes(id)}</span>
+        <span class="chev">›</span>
+      </div>`;
+    });
+    html += `</div>`;
+  }else{
+    html += `<div class="empty">閲覧履歴はまだありません</div>`;
+  }
+  return html;
+}
+
+/* v2.5.0: 選択中のタブに応じてホーム画面本体を描画（下部タブバーはHTML側の固定要素） */
+function renderBoards(main){
+  let html = renderHomeHero();
+  if(persist.homeTab==='boards') html += renderHomeTabBoards();
+  else if(persist.homeTab==='history') html += renderHomeTabHistory();
+  else html += renderHomeTabFav();
+  html += `<div style="height:24px"></div>`;
+  main.innerHTML = html;
+}
+function setHomeTab(tab){
+  if(persist.homeTab===tab){ if(STATE.view==='boards'){ $('#main').scrollTop=0; homeScrollTop=0; } return; }
+  persist.homeTab = tab;
+  savePersist();
+  if(STATE.view==='boards'){ renderBoards($('#main')); $('#main').scrollTop=0; homeScrollTop=0; updateHomeTabBarActive(); }
+}
+function updateHomeTabBarActive(){
+  $$('.home-tab-btn').forEach(btn=>{
+    btn.classList.toggle('active', btn.dataset.hometab===persist.homeTab);
+  });
+  updateHomeTabBadges();
+}
+/* v2.5.0: お気に入りタブに未読件数バッジを表示する（Chmate風） */
+function updateHomeTabBadges(){
+  const favs = persist.favorites.filter(id=> THREAD_INDEX[id] || resolveLiveThread(id));
+  let totalNew = 0;
+  favs.forEach(id=>{
+    const total = totalRes(id);
+    const read = persist.read[id] || 0;
+    if(total>read) totalNew += (total-read);
+  });
+  const favLabel = document.querySelector('.home-tab-btn[data-hometab="fav"] .htl');
+  if(favLabel){
+    favLabel.innerHTML = totalNew>0
+      ? `お気に入り<span class="htbadge">●${totalNew>99?'99+':totalNew}</span>`
+      : 'お気に入り';
+  }
+}
+
+/* ---------- render: threads ---------- */
+let threadFilterText = '';
+let threadSortMode = 'default';
+let threadSortBoardId = null;
+const THREAD_SORT_ORDER = ['default','res','momentum'];
+const THREAD_SORT_LABEL = {default:'デフォルト', res:'レス数順', momentum:'勢い順'};
+function nextThreadSortMode(mode){
+  return THREAD_SORT_ORDER[(THREAD_SORT_ORDER.indexOf(mode)+1) % THREAD_SORT_ORDER.length];
+}
+function computeMomentum(t){
+  const total = totalRes(t.id);
+  const ageH = Math.max((Date.now()-t.createdAt)/3600e3, 0.5);
+  return Math.round(total / (ageH/24));
+}
+function filterThreadList(list, keyword){
+  const kw = keyword.trim().toLowerCase();
+  if(!kw) return list;
+  return list.filter(t=>t.title.toLowerCase().includes(kw));
+}
+function sortThreadList(list, mode){
+  if(mode==='default') return list;
+  const arr = list.slice();
+  if(mode==='res') arr.sort((a,b)=> totalRes(b.id)-totalRes(a.id));
+  else if(mode==='momentum') arr.sort((a,b)=> computeMomentum(b)-computeMomentum(a));
+  return arr;
+}
+function getVisibleThreadList(){
+  const list = THREADS[STATE.boardId] || [];
+  return sortThreadList(filterThreadList(list, threadFilterText), threadSortMode);
+}
+function renderThreadRow(t){
+  const total = totalRes(t.id);
+  const read = persist.read[t.id];
+  const unread = total - (read || 0);
+  const isFav = persist.favorites.includes(t.id);
+  const isOwn = (persist.localPosts[t.id]?.length ?? 0) > 0;
+  /* v3.6.0: 1000レス終了（DAT落ち）済みのスレは行全体をグレーアウトし、専用バッジを表示する */
+  const isDatOchi = total >= 1000;
+  let html = `<div class="thread-row ${unread>0?'unread':'read'} ${isDatOchi?'datochi-row':''}" data-thread="${t.id}" data-board="${t.boardId}">
+    <div class="ttl">${esc(t.title)}</div>
+    <button class="fav-star ${isFav?'on':''}" data-fav="${t.id}">${isFav?'★':'☆'}</button>
+    <div class="meta">`;
+  html += `<span class="pill res">${total}</span>`;
+  if(isDatOchi) html += `<span class="pill dat">DAT落ち</span>`;
+  if(unread>0) html += `<span><span class="dot-new"></span><span class="pill new">${unread}</span></span>`;
+  if(isOwn) html += `<span class="pill done">自分の書き込みあり</span>`;
+  html += `</div></div>`;
+  return html;
+}
+function threadRowsHtml(list){
+  if(!list.length) return `<div class="empty">該当するスレがありません</div>`;
+  return list.map(t=>renderThreadRow(t)).join('');
+}
+function renderThreads(main){
+  /* v3.7.0: 板を切り替えても検索キーワード（threadFilterText）は維持し、新しい板でも
+     同じワードで自動的にフィルタされた状態から始まるようにする。
+     ソートモードは板ごとの一覧の性質が変わるため、従来通り板が変わったタイミングでデフォルトへ戻す。 */
+  if(threadSortBoardId !== STATE.boardId){ threadSortMode='default'; threadSortBoardId=STATE.boardId; }
+  const list = getVisibleThreadList();
+  let html = `<div class="list-toolbar">
+    <span class="cnt" id="threadCnt">${list.length}件</span>
+    <div class="toolbar-right">
+      <button class="sort-btn" data-act="thread-sort">${THREAD_SORT_LABEL[threadSortMode]}</button>
+    </div>
+  </div>
+  <div class="search-bar">
+    <input type="search" id="threadSearchInput" class="search-input" placeholder="スレを検索..." value="${esc(threadFilterText)}">
+    <!-- v3.8.0: 検索キーワード維持機能に伴う「クリアボタン」。キーワード空のときは非表示。 -->
+    <button class="search-clear-btn ${threadFilterText?'show':''}" id="threadSearchClearBtn" data-act="thread-search-clear" type="button" aria-label="検索をクリア">✕</button>
+  </div>
+  <div class="card-group" id="threadRows">${threadRowsHtml(list)}</div>`;
+  main.innerHTML = html;
+}
+/* v2.5.0: 板の切り替え・ソート変更など、入力フォーカスを気にしなくてよい場合の全体再描画 */
+function refreshThreadListView(){
+  if(STATE.view==='threads') renderThreads($('#main'));
+}
+/* v2.5.0: 検索欄バグ修正 - 文字入力のたびに #main 全体（input タグを含む）を
+   再描画していたためフォーカスが外れ、連続入力ができなくなっていた。
+   ここでは #threadRows（スレの並びだけを持つコンテナ）の中身とカウント表示だけを
+   差し替え、input要素自体には一切触れないことでフォーカス・IME状態を完全に維持する。 */
+function updateThreadSearchResults(){
+  if(STATE.view!=='threads') return;
+  const rows = $('#threadRows');
+  if(!rows){ renderThreads($('#main')); return; }
+  const list = getVisibleThreadList();
+  rows.innerHTML = threadRowsHtml(list);
+  const cntEl = $('#threadCnt');
+  if(cntEl) cntEl.textContent = `${list.length}件`;
+}
+
+/* ---------- render: res (posts) ---------- */
+function getReadCount(threadId){ return persist.read[threadId] || 0; }
+function setReadCount(threadId, cnt){ persist.read[threadId]=cnt; savePersist(); }
+function addLocalPost(threadId, post){
+  if(!persist.localPosts[threadId]) persist.localPosts[threadId]=[];
+  persist.localPosts[threadId].push(post);
+  savePersist();
+}
+/* ---------- v2.4.0: 本文リンク化・画像抽出・返信カウント ---------- */
+const IMG_URL_RE = /(https?:\/\/[^\s]+?\.(?:jpg|jpeg|png|gif|webp)(?:\?[^\s]*)?)(?=[\s]|$)/gi;
+function extractImageUrls(body){
+  const s = String(body||'');
+  const matches = s.match(IMG_URL_RE);
+  return matches ? Array.from(new Set(matches)) : [];
+}
+/* 本文をエスケープした上で、>>N / ＞＞N のアンカーをクリック可能なリンクに変換する */
+function linkifyBody(body){
+  const escaped = esc(body);
+  return escaped.replace(/(&gt;&gt;|＞＞)(\d+)/g, (m, pre, num)=>{
+    return `<span class="anchor" data-res="${num}">${pre}${num}</span>`;
+  });
+}
+/* v2.8.0: スレ主（>>1）のIDを取得する。posts配列は num:1 から始まる想定 */
+function computeOpId(posts){
+  const p1 = posts.find(p=>p.num===1) || posts[0];
+  return p1 ? p1.id : null;
+}
+/* v2.8.0: 通常画面・各種ポップアップ（ID/アンカー/返信一覧）の投稿1件分を共通ロジックで描画する。
+   NG登録されたIDは本文を隠して「あぼーん（NG-ID）」と表示し、スレ主IDには【主】バッジを付与する。 */
+/* v4.3.0: 第4引数replyMapを追加。渡された場合、メイン画面と全く同様のロジックで
+   「N件の返信」バッジ（.reply-badge）をポップアップ内のレスにも描画する。
+   これにより、ポップアップの中で開いたレスからさらに「返信一覧」をタップして
+   別のポップアップを重ねて開く、という無限のツリー探索が可能になる。
+   replyMapは常に「スレ全体のposts」から作られたものを渡す想定（ポップアップ内で
+   一部のレスだけを表示している場合でも、返信件数はスレ全体を基準に数える）。
+   引数を省略した場合（replyMap未指定）は従来通りバッジを出さないため、
+   呼び出し側を1つでも直し忘れてもクラッシュせず、単に機能が付かないだけで済む
+   安全な設計にしている。 */
+function renderPopupPostHtml(p, opId, idCounts, replyMap){
+  const isNgId = !!(p.id && persist.ngIds.includes(p.id));
+  /* v3.6.0: ID/アンカー/返信一覧ポップアップでもNGワードの判定結果を反映し、
+     本編と表示内容が食い違わないようにする */
+  const isNgWord = !isNgId && isBodyNgMatched(p.body);
+  const isNg = isNgId || isNgWord;
+  let pidHtml = '';
+  if(p.id){
+    const idCnt = (idCounts && idCounts[p.id]) || 0;
+    const pidClass = idCnt>=5 ? ' pid-hot' : (idCnt>=3 ? ' pid-warn' : '');
+    const countHtml = idCnt>=2 ? `<span class="id-count">(${idCnt})</span>` : '';
+    pidHtml = `<span class="pid${pidClass}" data-id="${esc(p.id)}">${esc(p.id)}</span>${countHtml}`;
+  }
+  const nushiHtml = (opId && p.id===opId) ? `<span class="badge-nushi">【主】</span>` : '';
+  const headHtml = `<div class="post-head"><span class="pnum">${p.num}</span><span class="pname">${esc(p.name)}</span>${p.date?`<span class="pmeta">${esc(p.date)}</span>`:''}${pidHtml}${nushiHtml}</div>`;
+  if(isNg){
+    /* メイン画面(renderRes)と同じく、NG該当レスは本文を隠して返信バッジも出さない */
+    const bodyHtml = `<div class="post-body ng-body"><span class="ng-label">${isNgId ? 'あぼーん（NG-ID）' : 'あぼーん（NGワード）'}</span></div>`;
+    return `<div class="post ng" data-num="${p.num}">${headHtml}${bodyHtml}</div>`;
+  }
+  const bodyHtml = `<div class="post-body">${linkifyBody(p.body)}</div>`;
+  const replies = replyMap ? replyMap[p.num] : null;
+  const replyHtml = (replies && replies.length)
+    ? `<span class="reply-badge" data-replies="${p.num}">${replies.length}件の返信</span>`
+    : '';
+  return `<div class="post" data-num="${p.num}">${headHtml}${bodyHtml}${replyHtml}</div>`;
+}
+/* スレ内の全レスを走査し、「そのレス番号に対して返信しているレス番号一覧」のマップを作る */
+function buildReplyMap(posts){
+  const map = {};
+  const re = /(?:>>|＞＞)(\d+)/g;
+  posts.forEach(p=>{
+    let m;
+    re.lastIndex = 0;
+    while((m = re.exec(p.body))){
+      const target = parseInt(m[1],10);
+      if(!target || target===p.num) continue;
+      if(!map[target]) map[target]=[];
+      if(!map[target].includes(p.num)) map[target].push(p.num);
+    }
+  });
+  return map;
+}
+function openComposeForReply(num){ $('#cBody').value=`>>${num} `; $('#composeBar').classList.add('expanded'); $('#cBody').focus(); }
+
+/* ---------- v2.8.0: 次スレ候補検索（ボタンをタップした瞬間にだけ検索を実行する） ---------- */
+function findNextThreadCandidates(currentThreadId){
+  const currentThread = THREAD_INDEX[currentThreadId];
+  if(!currentThread) return [];
+  /* タイトルから「Part」「★」などの記号と数字を除いたキーワードを抽出 */
+  let keyword = currentThread.title
+    .replace(/Part\s*\d+/gi, '')
+    .replace(/\d+$/g, '')
+    .replace(/【.*?】/g, '')
+    .replace(/★+/g, '')
+    .trim();
+  if(!keyword || keyword.length < 2) return [];
+  /* 同じ板内で同じキーワードを含む別のスレッドを検索 */
+  const boardId = currentThread.boardId;
+  const candidates = (THREADS[boardId] || [])
+    .filter(t=> t.id !== currentThreadId && t.title.includes(keyword))
+    .sort((a,b)=> (totalRes(b.id)||0) - (totalRes(a.id)||0))
+    .slice(0, 5);
+  return candidates;
+}
+/* v2.8.0バグ修正: 「[ 🔍 次スレ候補を検索 ]」ボタンは最初はボタンだけを表示し、
+   タップした瞬間に初めて findNextThreadCandidates を実行してアコーディオン展開する。
+   （以前のバージョンでは最初から候補が露出してしまうバグがあった） */
+function renderNextThreadSection(currentThreadId){
+  return `<div class="next-thread-section">
+    <button class="next-thread-btn" data-act="search-next-thread" data-thread="${currentThreadId}">
+      🔍 次スレ候補を検索
+    </button>
+    <div class="next-thread-candidates" id="nextThreadCandidates" style="display:none;"></div>
+  </div>`;
+}
+function toggleNextThreadCandidates(threadId){
+  const box = $('#nextThreadCandidates');
+  if(!box) return;
+  const isOpen = box.style.display !== 'none';
+  if(isOpen){ box.style.display = 'none'; return; }
+  if(box.dataset.loaded !== '1'){
+    const candidates = findNextThreadCandidates(threadId);
+    box.innerHTML = candidates.length
+      ? candidates.map(t=>`<a class="next-thread-link" data-board="${esc(t.boardId)}" data-thread="${esc(t.id)}">${esc(t.title)} <span style="color:var(--meta); font-size:11px;">(${totalRes(t.id)})</span></a>`).join('')
+      : `<div class="next-thread-empty">次スレ候補が見つかりませんでした</div>`;
+    box.dataset.loaded = '1';
+  }
+  box.style.display = 'flex';
+}
+function copyPostBody(num){
+  const posts = getPosts(STATE.threadId);
+  const post = posts.find(p=>p.num===num);
+  if(post && navigator.clipboard){
+    navigator.clipboard.writeText(post.body).then(()=>{ closeResMenu(); toast('コピーしました'); });
+  }
+}
+/* =========================================================================
+   v3.1.0バグ修正: おーぷん2chの bbs.cgi は送信データが Shift_JIS でないと
+   100%エラーになる仕様のため、v3.0.0の URLSearchParams（UTF-8固定）送信は
+   常に失敗していた。
+
+   ブラウザ標準の TextEncoder は UTF-8 専用で Shift_JIS へのエンコードができず、
+   JIS X 0208 の全文字（漢字含む数千字）を自前でテーブル化するのは非現実的な上、
+   1文字でも変換を誤ると実際の公開スレに文字化けした投稿をしてしまう危険がある。
+
+   そこで「ブラウザ自身が持つ正しいShift_JISエンコーダー」を使う抜け道として、
+   非表示の <form accept-charset="Shift_JIS"> を隠しiframeへ向けて送信するハックを
+   採用する。フォームのクロスオリジン送信はCORSの制限を受けないため、これだけで
+   CORS問題とShift_JIS問題の両方を同時に回避できる（＝文字コードの変換ミスが
+   原理的に発生しない、ブラウザ純正の変換だけを使う）。
+
+   トレードオフ: 送信先iframeの内容はクロスオリジンのため読み取れず、この場で
+   成功/失敗を直接判定することはできない。そのため postMessage() 側では、
+   送信後にいったんローカル擬似レスとして安全に表示しつつ、少し待ってから
+   refreshThread() で最新datを取得し直す。実際に反映されていれば、上の
+   pruneStaleLocalPosts()（本文一致マージ）が自動的にローカル分を片付ける。
+
+   v3.2.0: おーぷん2ch側のCookie/トークンチェック等により、この隠しフォーム
+   送信がサーバー側で弾かれるケースは残る。これは単一HTMLファイルのSPAという
+   構成上の限界として受け入れ、送信ロジック自体はこのままとする。ユーザーへは
+   「送信した」という事実と「未反映の場合はローカルに残る」という安全策を
+   トースト文言で正しく伝えることを優先する（postMessage() 側で対応）。 */
+function submitViaHiddenForm(t, name, body){
+  return new Promise((resolve)=>{
+    let done = false;
+    const iframeName = 'sjisPostFrame_' + Date.now() + '_' + Math.floor(Math.random()*1e6);
+    const iframe = document.createElement('iframe');
+    iframe.name = iframeName;
+    iframe.style.display = 'none';
+    document.body.appendChild(iframe);
+
+    const form = document.createElement('form');
+    form.method = 'POST';
+    form.action = `https://${t.server}/test/bbs.cgi`;
+    form.acceptCharset = 'Shift_JIS';
+    form.target = iframeName;
+    form.style.display = 'none';
+    const fields = {
+      bbs: t.boardKey,
+      key: t.threadKey,
+      time: String(Math.floor(Date.now()/1000)),
+      FROM: name,
+      mail: '',
+      MESSAGE: body,
+      submit: '書き込む',
+    };
+    Object.entries(fields).forEach(([k,v])=>{
+      const inp = document.createElement('input');
+      inp.type = 'hidden'; inp.name = k; inp.value = v;
+      form.appendChild(inp);
+    });
+    document.body.appendChild(form);
+
+    const finish = (ok)=>{
+      if(done) return; done = true;
+      setTimeout(()=>{ form.remove(); iframe.remove(); }, 50);
+      resolve(ok);
+    };
+    iframe.addEventListener('load', ()=> finish(true), { once:true });
+    /* loadイベントが発火しない環境（一部モバイルブラウザ等）向けの保険タイムアウト */
+    setTimeout(()=> finish(true), 3000);
+
+    /* v3.4.0バグ修正:「form.submit is not a function」クラッシュ対策
+       fields に submit:'書き込む'（おーぷん2ch側が要求する送信ボタン名。
+       サーバー仕様上この名前は変更できない）があるため、name="submit" の
+       隠しinputがフォーム内に生成される。ブラウザのDOM仕様上、フォーム内に
+       name="submit" の要素が存在すると、form.submit というプロパティ自体が
+       そのinput要素に上書き（シャドーイング）され、本来のsubmit()メソッドを
+       呼び出せなくなり100%クラッシュする（TypeError: form.submit is not a
+       function）。
+       そこで form.submit() ではなく、名前衝突の影響を受けない
+       HTMLFormElement.prototype.submit を call() で直接呼び出す形に修正する。
+       こちらはプロトタイプチェーンを直接叩くため、name="submit" の
+       シャドーイングが起きていても常に安全に動作する。 */
+    try{ HTMLFormElement.prototype.submit.call(form); }
+    catch(err){ finish(false); }
+  });
+}
+/* 戻り値: true = Shift_JISで送信自体は完了（成否はrefreshThreadで間接確認）
+           false = フォーム構築・送信そのものに失敗（即ローカルへフォールバック） */
+async function submitToOpen2ch(t, name, body){
+  try{
+    return await submitViaHiddenForm(t, name, body);
+  }catch(err){
+    return false;
+  }
+}
+/* v3.4.0: プロアクティブ・デバッグ対応
+   1) 送信中の連打による同一スレへの二重投稿を防ぐロック（スレ単位で管理するため、
+      投稿確認中でも別スレへの新規投稿は妨げない）。
+   2) 隠しform送信は応答確認に最大3秒、その後の反映確認にも数秒かかる。この間に
+      ユーザーが別スレ・別画面へ移動する「非同期処理の競合」に備え、投稿対象の
+      threadId をこの時点でスナップショットし、以後は STATE.threadId を直接
+      参照しない。これにより、移動後に届いた結果が誤って「今見ている別のスレ」
+      に書き込まれたり、今見ている別スレの入力欄を誤って消してしまう事故を防ぐ。 */
+const postingThreadIds = new Set();
+async function postMessage(){
+  const threadId = STATE.threadId;
+  if(!threadId) return;
+  if(postingThreadIds.has(threadId)){ toast('送信中です。少々お待ちください'); return; }
+  /* v3.5.0: 「1000レス終了（DAT落ち）」防御 - ボタン非表示/disabledによるUI制御をすり抜けて
+     呼ばれても、ここで確実に書き込みを止める（多重の安全策） */
+  if(totalRes(threadId) >= 1000){ toast('このスレッドは1000を超えています。新しいレスは書き込めません'); return; }
+  const name = $('#cName').value.trim() || '名無しさん';
+  const body = $('#cBody').value.trim();
+  if(!body){ toast('本文を入力してください'); return; }
+  const t = THREAD_INDEX[threadId];
+  /* 投稿完了時点で、まだ同じスレを表示しているかどうかを確認するヘルパー。
+     別画面/別スレに移動済みなら、入力欄のクリアや再描画は行わない。 */
+  const isStillHere = ()=> STATE.view==='res' && STATE.threadId===threadId;
+
+  postingThreadIds.add(threadId);
+  if(isStillHere()){
+    const btn = document.querySelector('[data-act="compose-post"]');
+    if(btn) btn.disabled = true;
+  }
+  try{
+
+  if(t && t.live){
+    /* v3.1.0: 実データスレはShift_JIS対応の隠しform経由で本物のおーぷん2chへ送信を試みる */
+    showLoading();
+    let sent = false;
+    try{ sent = await submitToOpen2ch(t, name, body); }
+    catch(err){ sent = false; }
+    hideLoading();
+    if(sent){
+      /* v3.1.0バグ修正: 応答を直接確認できないため、まずローカルにも安全策として
+         即時表示しておく（＝書き込み内容が絶対に失われない）。実際にサーバーへ
+         反映されていれば、この後のバックグラウンド確認で本文一致マージが
+         自動的にローカルの重複表示を片付けてくれる。 */
+      const num = totalRes(threadId) + 1;
+      const post = { num, name, date:formatDate(Date.now()), id:'ID:local', body, ts:Date.now() };
+      addLocalPost(threadId, post);
+      if(persist.draft && persist.draft[threadId]){ delete persist.draft[threadId]; savePersist(); }
+      if(isStillHere()){
+        $('#cName').value=''; $('#cBody').value='';
+        $('#composeBar').classList.remove('expanded');
+        renderRes($('#main'));
+      }
+      toast('おーぷん2chへ送信しました（未反映時はローカルに保持されます）');
+      /* v3.4.0: refreshThread()（現在表示中のスレを対象にする関数）ではなく、
+         必ず「投稿した本来のスレ」を対象にする専用関数でバックグラウンド確認する。
+         ユーザーが既に別スレへ移動していても、確認先を絶対に取り違えない。 */
+      setTimeout(()=>{ silentlyReconcileAfterPost(threadId); }, 4000);
+      return;
+    }
+    toast('実書き込みの送信に失敗したため、ローカルにのみ保存しました');
+  }
+
+  /* ダミースレ、または実送信そのものに失敗した場合のフォールバック（ローカル擬似書き込み） */
+  const num = totalRes(threadId) + 1;
+  const post = { num, name, date:formatDate(Date.now()), id:'ID:local', body, ts:Date.now() };
+  addLocalPost(threadId, post);
+  /* v2.3.0: 投稿が完了したら下書きを破棄する */
+  if(persist.draft && persist.draft[threadId]){ delete persist.draft[threadId]; savePersist(); }
+  if(isStillHere()){
+    $('#cName').value=''; $('#cBody').value='';
+    $('#composeBar').classList.remove('expanded');
+    renderRes($('#main'));
+  }
+  toast('書き込みました（ローカルのみ）');
+
+  } finally {
+    postingThreadIds.delete(threadId);
+    if(isStillHere()){
+      const btn = document.querySelector('[data-act="compose-post"]');
+      if(btn) btn.disabled = false;
+    }
+  }
+}
+/* v3.4.0: 投稿後のバックグラウンド確認専用（silentlyの意味は「勝手に画面へ
+   割り込まない」）。指定した threadId のデータだけを静かに再取得し、
+   ユーザーがまだそのスレを見ている場合に限り画面を最新化する。
+   確認に失敗しても、それはユーザー操作によるエラーではないため、
+   トーストもエラー表示も出さずに静かに諦める（ensureLivePostsのsilent引数）。 */
+async function silentlyReconcileAfterPost(threadId){
+  try{ await ensureLivePosts(threadId, true, true); }
+  catch(err){ /* バックグラウンド確認なので失敗しても静かに諦める */ }
+  if(STATE.view==='res' && STATE.threadId===threadId){
+    renderRes($('#main'));
+  }
+}
+function renderRes(main){
+  const t = THREAD_INDEX[STATE.threadId];
+  if(!t){ main.innerHTML='<div class="empty">スレッドが見つかりません</div>'; return; }
+
+  /* v2.4.0: 実データ(live)スレは、通信が完了して LIVE_POSTS にデータが
+     格納されるまで、メイン画面には一切レスを描画しない（ダミーデータのチラ見え防止）。
+     ローディング中はローディングインジケーターのみを表示して待機する。 */
+  if(t.live && !LIVE_POSTS[STATE.threadId]){
+    /* v2.10.0バグ修正: 通信失敗時（t.error）は「レスがありません」と誤解させる
+       空スレ表示ではなく、専用のエラーUIと再読み込みボタンを表示する。 */
+    if(t.error){
+      main.innerHTML = `<div class="empty">
+        <div style="font-size:32px; margin-bottom:8px;">⚠️</div>
+        <div style="margin-bottom:14px;">データの取得に失敗しました<br>通信環境をご確認ください</div>
+        <button class="btn primary" data-act="thread-retry" style="flex:0 0 auto; padding:10px 22px;">🔄 再読み込み</button>
+      </div>`;
+    } else {
+      main.innerHTML = `<div class="empty">
+        <div class="loading-spinner" style="margin:0 auto 14px;"></div>
+        読み込み中...
+      </div>`;
+    }
+    $('#composeBar').classList.remove('show'); $('#main').classList.remove('has-compose');
+    return;
+  }
+
+  const posts = getPosts(STATE.threadId);
+  const read = getReadCount(STATE.threadId);
+  const newCount = Math.max(0, posts.length-read);
+
+  addHistory(STATE.threadId);
+  savePersist();
+  
+  const replyMap = buildReplyMap(posts);
+  /* v2.6.0: Chmate風「IDの発言回数に応じた色付け」- スレ内でのID出現数を先に集計しておく */
+  const idCounts = {};
+  posts.forEach(p=>{ if(p.id) idCounts[p.id] = (idCounts[p.id]||0)+1; });
+  /* v2.8.0: スレ主（>>1）と同一IDのレスすべてに【主】バッジを付与するため、先にOPのIDを取得しておく */
+  const opId = computeOpId(posts);
+  /* v4.0.0: 「【主】のみ」抽出表示モード。
+     opIdが未確定（実データ未着など）の間はフィルタを適用せず全レス表示にフォールバックすることで、
+     エラーやクラッシュ、画面が真っ白になる事故を防ぐ。ユーザーがONにした意図(nushiOnlyWanted)自体は
+     保持し続けるため、直後の再描画（通信完了後など）でopIdが確定次第、自動的にフィルタが効き始める。
+     v4.1.0バグ修正: 以前はスレ主以外のレスをposts配列の時点でfilter()して物理的にDOMから
+     除外していたが、これだと.postのDOM要素自体が存在しないため、jumpToPost()経由の
+     アンカージャンプ（>>N タップ→該当レスへスクロール）が100%失敗する欠陥があった。
+     必ず「全レス」をループしてDOM要素そのものは常に生成した上で、スレ主以外のレスには
+     `.nushi-hidden`クラスだけを付けて画面上隠す設計に変更する。これにより、ジャンプ先の
+     要素は常にDOM上に存在し続け、jumpToPost側で必要な時だけ隠しクラスを解除できる。 */
+  const nushiOnlyWanted = !!nushiOnlyByThread[STATE.threadId];
+  const nushiOnly = nushiOnlyWanted && !!opId;
+  const nushiBtn = document.querySelector('[data-act="nushi-toggle"]');
+  if(nushiBtn) nushiBtn.classList.toggle('on', nushiOnlyWanted);
+  let html='';
+  let dividerShown=false;
+  let visibleCount=0;
+  posts.forEach((p)=>{
+    /* v3.0.0バグ修正: idx+1 ではなく、投稿が本来持つ p.num を表示に使う。
+       ローカル書き込み後にサーバーの実データが増えても番号がスライドしないようにする */
+    const num=p.num;
+    if(!dividerShown && num>read && newCount>0){
+      html+=`<div class="new-divider flash"><span>未読レス ${newCount}件</span></div>`;
+      dividerShown=true;
+    }
+    const isMine = p.id==='ID:local';
+    const isNgId = !!(p.id && persist.ngIds.includes(p.id));
+    /* v3.6.0: NG-IDに該当しないレスだけ、本文NGワード/正規表現との照合を行う
+       （IDで既にNG判定が付いている場合は本文チェックをスキップしてループ負荷を減らす） */
+    const isNgWord = !isNgId && isBodyNgMatched(p.body);
+    const isNg = isNgId || isNgWord;
+    /* v4.1.0: スレ主のみ表示ONの時、スレ主以外のレスに付与する非表示クラス。
+       DOM要素自体は必ず生成されるため、jumpToPost()側で解除すればいつでも表示できる。 */
+    const isNushiHidden = nushiOnly && p.id!==opId;
+    if(!isNushiHidden) visibleCount++;
+    const nushiHiddenClass = isNushiHidden ? ' nushi-hidden' : '';
+    let pidHtml = '';
+    if(p.id){
+      const idCnt = idCounts[p.id] || 0;
+      /* 1〜2回:通常色 / 3〜4回:注意色 / 5回以上:激しく書き込んでいるIDとして赤字太字 */
+      const pidClass = idCnt>=5 ? ' pid-hot' : (idCnt>=3 ? ' pid-warn' : '');
+      const countHtml = idCnt>=2 ? `<span class="id-count">(${idCnt})</span>` : '';
+      pidHtml = `<span class="pid${pidClass}" data-id="${esc(p.id)}">${esc(p.id)}</span>${countHtml}`;
+    }
+    /* v2.8.0: スレ主バッジ（>>1のIDと一致するレス全てに付与） */
+    const nushiHtml = (opId && p.id===opId) ? `<span class="badge-nushi">【主】</span>` : '';
+    const headHtml = `<div class="post-head">
+        <span class="pnum">${num}</span>
+        <span class="pname">${esc(p.name)}</span>
+        <span class="pmeta">${esc(p.date)}</span>
+        ${pidHtml}${nushiHtml}
+      </div>`;
+    if(isNg){
+      /* v2.4.0: NG登録済みのIDのレスは本文を隠して省略表示する
+         v3.6.0: NGワード/正規表現にマッチした場合もラベルを分けて同様に隠す */
+      const ngLabel = isNgId ? 'あぼーん（NG-ID）' : 'あぼーん（NGワード）';
+      html+=`<div class="post ng${nushiHiddenClass}" data-num="${num}">
+        ${headHtml}
+        <div class="post-body ng-body"><span class="ng-label">${ngLabel}</span></div>
+      </div>`;
+      return;
+    }
+    const images = extractImageUrls(p.body);
+    let thumbHtml='';
+    if(images.length){
+      thumbHtml = `<div class="post-thumb-wrap">` + images.map(url=>
+        `<img class="post-thumb" src="${esc(url)}" data-full="${esc(url)}" loading="lazy" alt="添付画像">`
+      ).join('') + `</div>`;
+    }
+    const replies = replyMap[num];
+    const replyHtml = (replies && replies.length)
+      ? `<span class="reply-badge" data-replies="${num}">${replies.length}件の返信</span>`
+      : '';
+    html+=`<div class="post ${isMine?'own':''}${nushiHiddenClass}" data-num="${num}">
+      ${headHtml}
+      <div class="post-body">${linkifyBody(p.body)}</div>
+      ${thumbHtml}
+      ${replyHtml}
+    </div>`;
+  });
+  if(!html) html=`<div class="empty">レスがありません</div>`;
+  /* v4.1.0: フィルタ方式をCSS非表示に変えたことで、上のhtmlは常に非空になる
+     （非表示レスのdivもDOM上には存在するため）。スレ主のレスが1件もない場合の
+     案内は、可視件数(visibleCount)を別途見て判定する。 */
+  else if(nushiOnly && visibleCount===0){
+    html = `<div class="empty">スレ主のレスがありません</div>` + html;
+  }
+  /* v2.8.0: スレ最下部に次スレ候補検索ボタンを設置（タップするまで候補は非表示） */
+  html += renderNextThreadSection(STATE.threadId);
+  main.innerHTML=html;
+  /* v4.2.0: v4.1.0では「【主】のみ」表示ON中に既読カウントの更新自体をスキップしていたが、
+     このアプリにはスレッドごとの既読スクロール位置の自動復元(scrollPositions)が既に
+     完備されているため、表示モードに関わらず一律で既読を進めても「見ていないのに
+     既読扱いになる」体験上の不都合は生じない。むしろスキップし続けると、スレ主の
+     レスを最後まで読んでも一覧の未読バッジが減らないという逆に不便な状態になっていた。
+     表示モードのON/OFFに関わらず、常に一律でsetReadCount()を実行する仕様に統一する。 */
+  setReadCount(STATE.threadId, posts.length);
+  /* v3.5.0: 「1000レス終了（DAT落ち）」制御。総レス数が1000以上のスレは、
+     書き込みフォームを隠して代わりに案内メッセージを表示する。 */
+  const isDatOchi = posts.length >= 1000;
+  $('#composeBar').classList.add('show'); $('#main').classList.add('has-compose');
+  $('#composeBar').classList.toggle('datochi', isDatOchi);
+  /* v2.3.0: 保存されていた下書きを書き込みフォームへ自動復元 */
+  const draft = (persist.draft && persist.draft[STATE.threadId]) || {};
+  $('#cName').value = draft.name || '';
+  $('#cBody').value = draft.body || '';
+  /* v3.4.0: 「書き込む」ボタンの押下可否は、今表示しているスレが現在投稿処理中か
+     どうかに合わせて毎回同期する。これにより、別スレへ移動しても押せない状態が
+     誤って引き継がれたり、逆に投稿中のスレへ戻った際に押せてしまったりしない。 */
+  const postBtn = document.querySelector('[data-act="compose-post"]');
+  if(postBtn) postBtn.disabled = postingThreadIds.has(STATE.threadId) || isDatOchi;
+  /* v3.5.0: 実データの描画が完了したこのタイミングで、保存済みの既読スクロール位置を復元する
+     （早期returnするローディング/エラー分岐は通らないため、データ未着時の位置ズレを避けられる） */
+  restoreScrollPositionIfPending(STATE.threadId, main);
+}
+function scrollThreadTop(){ $('#main').scrollTop=0; }
+function scrollThreadBottom(){ const m=$('#main'); m.scrollTop=m.scrollHeight; }
+/* v3.7.0: 更新ボタン用の「なめらかスクロール」版。fab-navの▼ボタン（即座にジャンプ）とは
+   役割が違うため、既存のscrollThreadBottom()には手を加えず別関数として追加する。 */
+function smoothScrollThreadBottom(){
+  const m = $('#main');
+  if(!m) return;
+  try{ m.scrollTo({top:m.scrollHeight, behavior:'smooth'}); }
+  catch(e){ m.scrollTop = m.scrollHeight; /* smooth未対応環境向けフォールバック */ }
+}
+
+/* ---------- v3.7.0: スレ更新時の「新着レス通知」バッジ ---------- */
+/* 通知バッジは #app 直下の固定要素として常に1つだけ存在し、表示中のスレッドIDを
+   newArrivalNoticeThreadId に保持する。renderView() 側で「今見ている画面/スレッドと
+   食い違ったら消す」ガードを入れているため、別スレへ移動した後に前のスレの通知が
+   誤って残ることはない。 */
+let newArrivalNoticeThreadId = null;
+function showNewArrivalNotice(threadId, count){
+  const el = $('#newArrivalNotice');
+  if(!el || count<=0) return;
+  newArrivalNoticeThreadId = threadId;
+  el.textContent = `▼ 下に${count}件の新着レス`;
+  el.classList.add('show');
+}
+function hideNewArrivalNotice(){
+  newArrivalNoticeThreadId = null;
+  const el = $('#newArrivalNotice');
+  if(el) el.classList.remove('show');
+}
+/* 通知バッジのタップ操作：最下部までなめらかにスクロールする。
+   通知を消すタイミングは、この後の#mainスクロールイベント側で「最下部付近に到達したか」を
+   見て自動判定するため、ここで即座に消す必要はない（手動スクロールで消える処理と共通化できる）。 */
+function jumpToBottomFromNotice(){
+  smoothScrollThreadBottom();
+}
+async function refreshThread(){
+  const targetThreadId = STATE.threadId;
+  if(!targetThreadId) return;
+  /* v3.8.0: 新着レス数の計算は、ローカル投稿（ID:local）に惑わされない
+     「純粋なサーバー側の実データ件数」の差分を基準にする。
+     更新前に LIVE_POSTS か GEN_CACHE から直接長さを取得し、スナップショットする。
+     これにより、通信後にローカル投稿がマージされて消去されても、新着件数の計算がズレない。 */
+  const prevLiveCount = LIVE_POSTS[targetThreadId]?.length || (GEN_CACHE[targetThreadId]?.length || 0);
+  /* 前回の更新で出したままの通知が残っていれば、いったんクリアしてから今回の結果で判定し直す */
+  if(newArrivalNoticeThreadId===targetThreadId) hideNewArrivalNotice();
+  await ensureLivePosts(targetThreadId, true);
+  /* v3.7.0: 通信中に別スレ・別画面へ移動している可能性があるため、renderRes()は
+     「今実際に表示すべき画面」を描くための呼び出しとして現在のSTATEに委ねる
+     （renderRes自身が常にSTATE.threadIdを参照して描画するため、ここでは呼ぶだけでよい） */
+  renderRes($('#main'));
+  /* v2.10.0: 通信失敗時は ensureLivePosts 側で既にエラートーストが出るため、
+     ここで重ねて「更新しました」と出して誤解させないようにする */
+  const t = THREAD_INDEX[targetThreadId];
+  if(!t || !t.error) toast('更新しました');
+  /* v3.7.0 / v3.8.0: 新着レス通知。まだ更新対象と同じスレ・res画面を見ている場合に限り表示する
+     （更新中に別スレへ移動していた場合、無関係なスレに誤って通知が浮き出るのを防ぐ）
+     v3.8.0: 新着件数はローカル投稿に惑わされない純粋なLIVE_POSTSベースで計算する */
+  if(STATE.view==='res' && STATE.threadId===targetThreadId){
+    const newLiveCount = LIVE_POSTS[targetThreadId]?.length || 0;
+    const newCount = Math.max(0, newLiveCount - prevLiveCount);
+    if(newCount>0) showNewArrivalNotice(targetThreadId, newCount);
+  }
+}
+/* v2.4.0: 画像ギャラリーポップアップの完全復元
+   スレ内の全レスから画像URLを抽出し、グリッド表示する。
+   サムネイルタップ→ライトボックス拡大、番号バッジタップ→該当レスへジャンプ。 */
+function openGalleryPopup(){
+  const posts = getPosts(STATE.threadId);
+  const items = [];
+  posts.forEach(p=>{
+    extractImageUrls(p.body).forEach(url=> items.push({num:p.num, url}));
+  });
+  let html=`<div class="popup"><div class="popup-head"><div class="popup-head-title">画像一覧（${items.length}件）</div><div class="popup-head-actions"><button class="popup-close" data-act="popup-close">✕</button></div></div><div class="popup-body">`;
+  if(items.length){
+    html += `<div class="gallery-grid">`;
+    items.forEach(({num,url})=>{
+      html += `<div class="gallery-item">
+        <img class="gallery-thumb" src="${esc(url)}" data-full="${esc(url)}" loading="lazy" alt="添付画像">
+        <button class="gallery-num" data-act="gallery-jump" data-num="${num}">&gt;&gt;${num}</button>
+      </div>`;
+    });
+    html += `</div>`;
+  }else{
+    html += `<div class="popup-empty">このスレに画像はありません</div>`;
+  }
+  html+=`</div></div>`;
+  const popup=document.createElement('div');
+  popup.innerHTML=html;
+  const el=popup.firstElementChild;
+  registerPopup(el, ()=>{});
+}
+function jumpToPost(num){
+  /* v4.5.0バグ修正: 多層ポップアップが3重・4重に積まれている状態でジャンプすると、
+     closeTopPopup()を1回呼ぶだけでは最前面の1枚しか閉じず、残りのポップアップが
+     画面に残ったままフリーズしたように見えるバグがあった。ジャンプ実行時は
+     スタックに残っている分を問答無用で全て閉じ切り、#scrim/#popupLayerの
+     showクラスも完全に外れたクリーンな状態にしてから対象レスへ進む。 */
+  closeAllPopups();
+  const post=$(`[data-num="${num}"]`);
+  if(!post){ toast('該当レスが見つかりません'); return; }
+  if(post.classList.contains('nushi-hidden')){
+    /* v4.2.0バグ修正: v4.1.0では対象レス単体だけ.nushi-hiddenを解除していたが、
+       これだと前後のレス（他人のレス）は隠されたままなので、ジャンプ先のレスだけが
+       文脈から切り離された「孤立状態」で表示されてしまっていた。
+       ジャンプ対象がスレ主以外の隠しレスだった場合は、そのスレッドの「【主】のみ」
+       表示モード自体を自動でOFFにし、全レス通常表示へ戻してから改めてジャンプする。 */
+    const tid = STATE.threadId;
+    if(tid) nushiOnlyByThread[tid] = false;
+    /* renderRes()はmain.innerHTMLを丸ごと差し替えるため、上で取得したpost要素は
+       この時点でDOMツリーから切り離された古い参照になる。再描画後に同じdata-numを
+       持つ要素を改めて取得し直す必要がある。
+       また、innerHTML差し替え直後はレイアウト（scrollHeightなど）が完全には確定して
+       いないことがあるため、requestAnimationFrameで1フレーム分レイアウトの確定を
+       待ってからscrollIntoViewを実行し、モード切替の再描画とスクロールのタイミングが
+       非同期に競合してジャンプ位置がズレる事故を防ぐ。 */
+    renderRes($('#main'));
+    toast('スレ主のみ表示を解除しました');
+    requestAnimationFrame(()=>{
+      const target = $(`[data-num="${num}"]`);
+      if(target){
+        target.classList.add('flash-jump');
+        target.scrollIntoView({behavior:'smooth',block:'center'});
+        setTimeout(()=>target.classList.remove('flash-jump'),1300);
+      } else {
+        toast('該当レスが見つかりません');
+      }
+    });
+    return;
+  }
+  post.classList.add('flash-jump');
+  post.scrollIntoView({behavior:'smooth',block:'center'});
+  setTimeout(()=>post.classList.remove('flash-jump'),1300);
+}
+
+/* ---------- popup stack ---------- */
+let resMenuOpen = false;
+function closeTopPopup(){
+  if(popupStack.length){
+    const p=popupStack.pop(); popupRefreshers.pop();
+    if(p){ p.remove(); }
+    /* v4.0.0バグ修正: 全ポップアップが閉じ終わったタイミングで #scrim だけでなく
+       #popupLayer の show クラスも確実に外し、DOM空間を綺麗にクリーンアップする
+       （残ったままだと稀にレイヤーの状態不整合の原因になっていた） */
+    if(!popupStack.length){ $('#scrim').classList.remove('show'); $('#popupLayer').classList.remove('show'); }
+  }
+}
+/* v4.5.0: 多層（カスケード）ポップアップが2枚以上積まれている状態から、
+   一気に全部を閉じ切るためのヘルパー。closeTopPopup()を1回ずつ確実に
+   呼ぶwhileループとして実装することで、closeTopPopup側が既に持っている
+   「1枚ポップするたびにpopupRefreshersも同期してpopし、DOM要素をremoveし、
+   最後の1枚が消えた瞬間にだけ#scrim/#popupLayerのshowクラスを外す」という
+   ロジックをそのまま安全に再利用できる（重複実装によるロジックのズレを防ぐ）。 */
+function closeAllPopups(){
+  while(popupStack.length){ closeTopPopup(); }
+}
+function openIdPopup(id){
+  const buildBody = ()=>{
+    const posts = getPosts(STATE.threadId);
+    const matching = posts.filter(p=>p.id===id);
+    const opId = computeOpId(posts);
+    const idCounts = {}; posts.forEach(p=>{ if(p.id) idCounts[p.id]=(idCounts[p.id]||0)+1; });
+    /* v4.3.0: 返信バッジ表示のため、スレ全体を基準にしたreplyMapを渡す */
+    const replyMap = buildReplyMap(posts);
+    if(!matching.length) return `<div class="popup-empty">投稿はありません</div>`;
+    return matching.map(p=>renderPopupPostHtml(p, opId, idCounts, replyMap)).join('');
+  };
+  let html=`<div class="popup"><div class="popup-head"><div class="popup-head-title">ID: ${esc(id)}</div><div class="popup-head-actions"><button class="popup-close" data-act="popup-close">✕</button></div></div><div class="popup-body">${buildBody()}</div></div>`;
+  const popup = document.createElement('div');
+  popup.innerHTML=html;
+  const el = popup.firstElementChild;
+  registerPopup(el, ()=>{ const body=el.querySelector('.popup-body'); if(body) body.innerHTML=buildBody(); });
+}
+function openAnchorPopup(num){
+  const buildBody = ()=>{
+    const posts = getPosts(STATE.threadId);
+    const post = posts.find(p=>p.num===num);
+    const opId = computeOpId(posts);
+    const idCounts = {}; posts.forEach(p=>{ if(p.id) idCounts[p.id]=(idCounts[p.id]||0)+1; });
+    /* v4.3.0: 返信バッジ表示のため、スレ全体を基準にしたreplyMapを渡す */
+    const replyMap = buildReplyMap(posts);
+    return post ? renderPopupPostHtml(post, opId, idCounts, replyMap) : `<div class="popup-empty">レスが見つかりません</div>`;
+  };
+  let html=`<div class="popup"><div class="popup-head"><div class="popup-head-title">≫${num}</div><div class="popup-head-actions"><button class="popup-close" data-act="popup-close">✕</button></div></div><div class="popup-body">${buildBody()}</div></div>`;
+  const popup=document.createElement('div');
+  popup.innerHTML=html;
+  const el=popup.firstElementChild;
+  registerPopup(el, ()=>{ const body=el.querySelector('.popup-body'); if(body) body.innerHTML=buildBody(); });
+}
+/* v2.4.0: 「N件の返信」バッジからの返信一覧ポップアップの完全復元
+   指定レス番号(num)に対して >>num で返信している全レスを一覧表示する。 */
+function openReplyPopup(num){
+  const buildBody = ()=>{
+    const posts = getPosts(STATE.threadId);
+    const replyMap = buildReplyMap(posts);
+    const nums = replyMap[num] || [];
+    const matching = nums.map(n=> posts.find(p=>p.num===n)).filter(Boolean);
+    const opId = computeOpId(posts);
+    const idCounts = {}; posts.forEach(p=>{ if(p.id) idCounts[p.id]=(idCounts[p.id]||0)+1; });
+    if(!matching.length) return `<div class="popup-empty">返信はありません</div>`;
+    /* v4.3.0: このポップアップ内のレスにもさらに返信バッジを出し、タップで
+       別の返信一覧ポップアップをカスケードして重ねて開けるようにする（ツリー探索） */
+    return matching.map(p=>renderPopupPostHtml(p, opId, idCounts, replyMap)).join('');
+  };
+  const replyCount = (buildReplyMap(getPosts(STATE.threadId))[num] || []).length;
+  let html=`<div class="popup"><div class="popup-head"><div class="popup-head-title">&gt;&gt;${num} への返信（${replyCount}件）</div><div class="popup-head-actions"><button class="popup-close" data-act="popup-close">✕</button></div></div><div class="popup-body">${buildBody()}</div></div>`;
+  const popup=document.createElement('div');
+  popup.innerHTML=html;
+  const el=popup.firstElementChild;
+  registerPopup(el, ()=>{ const body=el.querySelector('.popup-body'); if(body) body.innerHTML=buildBody(); });
+}
+function openResMenu(postEl, x, y){
+  const num = parseInt(postEl.dataset.num, 10);
+  const post = getPosts(STATE.threadId).find(p=>p.num===num);
+  if(!post) return;
+  const isNg = persist.ngIds.includes(post.id);
+  let html=`<div class="res-menu" style="left:${x}px;top:${y}px">
+    <button class="res-menu-item" data-act="res-reply" data-num="${num}">
+      <span class="rmi-ico">↩</span><span>返信</span>
+    </button>
+    <button class="res-menu-item" data-act="res-copy" data-num="${num}">
+      <span class="rmi-ico">📋</span><span>コピー</span>
+    </button>
+    <div class="res-menu-sep"></div>
+    <button class="res-menu-item ${isNg?'danger':''}" data-act="res-ng" data-id="${esc(post.id)}">
+      <span class="rmi-ico">${isNg?'☑':'☐'}</span><span>${isNg?'NG解除':'NG登録'}</span>
+    </button>
+  </div>`;
+  const menu=document.createElement('div');
+  menu.innerHTML=html;
+  document.body.append(menu.firstElementChild);
+  resMenuOpen=true;
+}
+function closeResMenu(){ const m=document.querySelector('.res-menu'); if(m) m.remove(); resMenuOpen=false; }
+
+/* ---------- v2.6.0: スレメニュー（ヘッダー右上の ⋮ ボタン） ---------- */
+let threadMenuOpen = false;
+function closeThreadMenu(){ const m=document.querySelector('.thread-menu'); if(m) m.remove(); threadMenuOpen=false; }
+function openThreadMenu(btn){
+  if(threadMenuOpen){ closeThreadMenu(); return; }
+  closeResMenu();
+  if(!STATE.threadId) return;
+  const rect = btn.getBoundingClientRect();
+  const rightOffset = Math.max(8, Math.round(window.innerWidth - rect.right));
+  const isFav = persist.favorites.includes(STATE.threadId);
+  const html = `<div class="res-menu thread-menu" style="left:auto; right:${rightOffset}px; top:${Math.round(rect.bottom+6)}px">
+    <button class="res-menu-item" data-act="thread-menu-fav">
+      <span class="rmi-ico">${isFav?'★':'☆'}</span><span>${isFav?'お気に入り解除':'お気に入りに追加'}</span>
+    </button>
+    <button class="res-menu-item" data-act="thread-menu-gallery">
+      <span class="rmi-ico">🖼</span><span>画像一覧を開く</span>
+    </button>
+    <div class="res-menu-sep"></div>
+    <button class="res-menu-item" data-act="thread-menu-resetread">
+      <span class="rmi-ico">↺</span><span>このスレの既読をリセット</span>
+    </button>
+  </div>`;
+  const wrap=document.createElement('div');
+  wrap.innerHTML=html;
+  document.body.append(wrap.firstElementChild);
+  threadMenuOpen=true;
+}
+/* スレをお気に入りに追加／解除（タップするたび状態が反転しトーストで通知） */
+function toggleThreadFavoriteFromMenu(threadId){
+  if(!threadId) return;
+  const i = persist.favorites.indexOf(threadId);
+  let added;
+  if(i>=0){ persist.favorites.splice(i,1); added=false; }
+  else{ persist.favorites.push(threadId); added=true; }
+  savePersist();
+  updateHomeTabBadges();
+  toast(added ? 'お気に入りに追加しました' : 'お気に入りを解除しました');
+}
+/* このスレの既読数だけを0に戻し、次回スレ一覧・お気に入り一覧で未読表示に戻す */
+function resetReadForThread(threadId){
+  if(!threadId) return;
+  persist.read[threadId] = 0;
+  savePersist();
+  updateHomeTabBadges();
+  toast('このスレの既読をリセットしました');
+}
+/* v3.6.0: NG-ID / NGワードをタブで切り替えて一覧・追加・削除できるように拡張。
+   タブの選択状態はこのポップアップが開いている間だけ有効なクロージャ内変数として保持し、
+   閉じたら消える（永続化はしない = persist.homeTab等とは別物）。 */
+let ngManageTab = 'id';
+function openNgManagePopup(){
+  const buildIdBody = ()=>{
+    if(!persist.ngIds.length) return `<div class="popup-empty">NG登録されたIDはありません<br><span style="font-size:11px;">レス欄の名前/ID部分を長押し（タップ）してもNG登録できます</span></div>`;
+    return persist.ngIds.map(id=>`<div class="ng-list-row"><span class="ng-list-id">${esc(id)}</span><button class="ng-add-btn" data-act="ng-remove-list" data-id="${esc(id)}">削除</button></div>`).join('');
+  };
+  const buildWordBody = ()=>{
+    const words = persist.ngWords || [];
+    if(!words.length) return `<div class="popup-empty">NGワードは登録されていません<br><span style="font-size:11px;">単語をそのまま入力するか、/パターン/i のように / で囲むと正規表現として扱われます</span></div>`;
+    return words.map((w,idx)=>`<div class="ng-list-row"><span class="ng-list-id">${esc(w)}</span><button class="ng-add-btn" data-act="ng-remove-word" data-idx="${idx}">削除</button></div>`).join('');
+  };
+  const buildInner = ()=>{
+    const idCount = persist.ngIds.length;
+    const wordCount = (persist.ngWords||[]).length;
+    return `
+      <div class="popup-head"><div class="popup-head-title">NG管理</div><div class="popup-head-actions"><button class="popup-close" data-act="popup-close">✕</button></div></div>
+      <div class="ng-tab-bar">
+        <button class="ng-tab-btn ${ngManageTab==='id'?'active':''}" data-act="ng-tab-switch" data-ngtab="id">NG-ID (${idCount})</button>
+        <button class="ng-tab-btn ${ngManageTab==='word'?'active':''}" data-act="ng-tab-switch" data-ngtab="word">NGワード (${wordCount})</button>
+      </div>
+      <div class="ng-add-row">
+        <input type="text" id="ngManageInput" placeholder="${ngManageTab==='id' ? 'ID:xxxxxxxx' : '単語 または /正規表現/i'}" autocomplete="off">
+        <button class="ng-add-submit-btn" data-act="ng-manage-add">追加</button>
+      </div>
+      <div class="popup-body">${ngManageTab==='id' ? buildIdBody() : buildWordBody()}</div>
+    `;
+  };
+  const popup=document.createElement('div');
+  popup.className='popup ng-manage-popup';
+  popup.style.width='min(92vw,420px)';
+  popup.innerHTML = buildInner();
+  const refresh = ()=>{ popup.innerHTML = buildInner(); };
+  registerPopup(popup, refresh);
+  popup.__ngRefresh = refresh;
+}
+/* NG管理ポップアップのタブ切り替え。ポップアップ自体は閉じずに中身だけ差し替える */
+function switchNgManageTab(tab){
+  if(tab!=='id' && tab!=='word') return;
+  ngManageTab = tab;
+  refreshOpenPopups();
+}
+/* NG管理ポップアップの「追加」ボタン。現在選択中のタブに応じてID/ワードいずれかへ追加する */
+function submitNgManageAdd(popupEl){
+  const input = popupEl ? popupEl.querySelector('#ngManageInput') : null;
+  const val = input ? input.value.trim() : '';
+  if(!val){ toast('内容を入力してください'); return; }
+  if(ngManageTab==='id'){
+    ngAdd(val);
+    /* v3.7.0: 登録の成否に関わらず、直後のrefreshOpenPopups()でポップアップの中身自体は
+       再構築されるが、それに頼らず明示的にここで空欄へ戻し、連続登録の操作感を良くする */
+    if(input) input.value = '';
+  } else {
+    if(!Array.isArray(persist.ngWords)) persist.ngWords=[];
+    /* 正規表現形式（/pattern/flags）として指定された場合は、登録前に必ずコンパイルを試して
+       不正な指定を弾く。ここで防いでおくことで、後の描画時に毎回try-catchに頼らずに済む */
+    const m = /^\/(.*)\/([a-z]*)$/i.exec(val);
+    if(m){
+      try{ new RegExp(m[1], m[2]); }
+      catch(e){ toast('正規表現の形式が正しくありません'); return; }
+    }
+    if(persist.ngWords.includes(val)){ toast('既に登録されています'); return; }
+    persist.ngWords.push(val);
+    savePersist();
+    invalidateNgWordMatchersCache();
+    if(STATE.view==='res') renderRes($('#main'));
+    toast('NGワードを登録しました');
+    /* v3.7.0: 単語タブでの登録成功時も同様に入力欄をクリアする */
+    if(input) input.value = '';
+  }
+  refreshOpenPopups();
+}
+/* NGワード一覧からの削除 */
+function ngRemoveWord(idx){
+  if(!Array.isArray(persist.ngWords)) return;
+  if(idx<0 || idx>=persist.ngWords.length) return;
+  persist.ngWords.splice(idx,1);
+  savePersist();
+  invalidateNgWordMatchersCache();
+  if(STATE.view==='res') renderRes($('#main'));
+  refreshOpenPopups();
+  toast('NGワードを削除しました');
+}
+
+/* ---------- v4.4.0: カスタム板管理ポップアップ ----------
+   NG管理ポップアップと全く同じ「上部に追加フォーム、下部に一覧＋削除ボタン」の
+   構成を踏襲する。追加フォームだけURL・表示名の2項目になるため縦積みにしている。 */
+function openCustomBoardManagePopup(){
+  const buildListBody = ()=>{
+    const list = Array.isArray(persist.customBoards) ? persist.customBoards : [];
+    if(!list.length) return `<div class="popup-empty">カスタム板はまだ登録されていません<br><span style="font-size:11px;">上のフォームからおーぷん2chの板URLを登録できます</span></div>`;
+    return list.map(cb=>`<div class="ng-list-row">
+      <span class="ng-list-id">${esc(cb.name)}<br><span style="font-size:10.5px; color:var(--meta); font-weight:400;">${esc(cb.server)}/${esc(cb.key)}</span></span>
+      <button class="ng-add-btn" data-act="customboard-remove" data-id="${esc(cb.id)}">削除</button>
+    </div>`).join('');
+  };
+  const buildInner = ()=>{
+    const count = (persist.customBoards||[]).length;
+    return `
+      <div class="popup-head"><div class="popup-head-title">カスタム板管理 (${count})</div><div class="popup-head-actions"><button class="popup-close" data-act="popup-close">✕</button></div></div>
+      <div class="ng-add-row column">
+        <input type="text" id="customBoardUrlInput" placeholder="板URL（例: https://hayabusa.open2ch.net/livejupiter/）" autocomplete="off">
+        <input type="text" id="customBoardNameInput" placeholder="表示名（省略可・空欄なら板キー名）" autocomplete="off">
+        <button class="ng-add-submit-btn" data-act="customboard-add">＋ この板を追加</button>
+      </div>
+      <div class="popup-body">${buildListBody()}</div>
+    `;
+  };
+  const popup=document.createElement('div');
+  popup.className='popup ng-manage-popup';
+  popup.style.width='min(92vw,420px)';
+  popup.innerHTML = buildInner();
+  const refresh = ()=>{ popup.innerHTML = buildInner(); };
+  registerPopup(popup, refresh);
+}
+/* カスタム板管理ポップアップの「追加」ボタン。成功/失敗いずれもaddCustomBoard側で
+   toast済みのため、ここでは入力欄のクリアとポップアップの再描画だけを担当する。 */
+function submitCustomBoardAdd(popupEl){
+  const urlInput = popupEl ? popupEl.querySelector('#customBoardUrlInput') : null;
+  const nameInput = popupEl ? popupEl.querySelector('#customBoardNameInput') : null;
+  const rawUrl = urlInput ? urlInput.value.trim() : '';
+  const rawName = nameInput ? nameInput.value.trim() : '';
+  if(!rawUrl){ toast('板のURLを入力してください'); return; }
+  const ok = addCustomBoard(rawUrl, rawName);
+  if(ok){
+    if(urlInput) urlInput.value = '';
+    if(nameInput) nameInput.value = '';
+    if(STATE.view==='boards') renderView();
+  }
+  refreshOpenPopups();
+}
+
+/* ---------- drawer / import / export ---------- */
+function openDrawer(){ closeResMenu(); closeThreadMenu(); $('#drawer').classList.add('show'); $('#scrim').classList.add('show'); }
+function closeDrawer(){ $('#drawer').classList.remove('show'); if(!popupStack.length) $('#scrim').classList.remove('show'); }
+function exportData(){
+  const blob=new Blob([JSON.stringify(persist,null,2)],{type:'application/json'});
+  const url=URL.createObjectURL(blob);
+  const a=document.createElement('a');
+  a.href=url; a.download=`${APP_ID}_data_${todayStr()}.json`;
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(()=>URL.revokeObjectURL(url),1500);
+  closeDrawer(); toast('エクスポートしました');
+}
+function importData(file){
+  const r=new FileReader();
+  r.onload=()=>{
+    try{
+      const obj=ensureShape(JSON.parse(r.result));
+      persist=obj;
+      invalidateNgWordMatchersCache();
+      /* v4.4.0: インポートされたバックアップのcustomBoardsで実行時状態を作り直す。
+         現在のセッションで反映済みの古いカスタム板は、applyCustomBoards()内部で
+         いったん全て取り除いてから再構築されるため、亡霊データは残らない。 */
+      applyCustomBoards();
+      /* v4.7.0バグ修正: インポート直後もinit()と全く同じ理由で「お気に入り/履歴の
+         実データスレのタイトルが(読み込み中...)に化ける」問題が起こり得るため、
+         同じ復元処理をここでも実行する（順序はapplyCustomBoards()の後で固定）。 */
+      restoreThreadCacheIntoIndex();
+      STATE={view:persist.nav.view, boardId:persist.nav.boardId, threadId:persist.nav.threadId};
+      normalizeState(); savePersist();
+      /* インポート直後のsavePersist()で、万が一残っていたマイグレーションフラグも
+         ここで確実に消費・リセットしておく（次回以降の不要な早期保存を防ぐ） */
+      _customBoardIdMigrationOccurred = false;
+      history.replaceState(serialize(),'');
+      renderView(); toast('インポートしました');
+    }catch(err){ toast('読み込み失敗: JSON形式を確認してください'); }
+  };
+  r.readAsText(file);
+  closeDrawer();
+}
+function resetRead(){ persist.read={}; savePersist(); renderView(); closeDrawer(); toast('全スレを未読に戻しました'); }
+
+/* ---------- v2.3.0: データ全消去 ---------- */
+function clearAllData(){
+  const ok = window.confirm('本当にすべてのデータを削除しますか？お気に入りや既読履歴、設定がすべて初期化されます');
+  if(!ok) return;
+  try{ localStorage.clear(); }catch(e){}
+  location.reload();
+}
+
+/* ---------- NG (あぼーん) ---------- */
+/* v3.6.0: 本文（body）を対象としたNGワード/NG正規表現フィルタ。
+   ・通常の文字列は部分一致として扱う。
+   ・"/pattern/flags" のように / で囲まれた形式は正規表現として解釈する。
+   ・不正な正規表現や実行時エラーはすべて try-catch で無視し、他の判定やアプリ全体を
+     絶対にクラッシュさせない（1つの不正なNGワードのせいで全レスが表示できなくなる事故を防ぐ）。
+   ・大容量スレ（最大1000レス）でループ負荷を抑えるため、正規表現のコンパイルは
+     ワード追加/削除/インポート時にのみ行い、結果をキャッシュして再利用する
+     （投稿1件ごとに毎回コンパイルし直すことはしない）。 */
+let _ngWordMatchersCache = null;
+function invalidateNgWordMatchersCache(){ _ngWordMatchersCache = null; }
+function compileNgWordMatchers(){
+  const list = Array.isArray(persist.ngWords) ? persist.ngWords : [];
+  const matchers = [];
+  list.forEach(raw=>{
+    if(!raw) return;
+    const m = /^\/(.*)\/([a-z]*)$/i.exec(raw);
+    if(m){
+      try{
+        const re = new RegExp(m[1], m[2]);
+        matchers.push(body=>re.test(body));
+      }catch(e){ /* 不正な正規表現はこのワードだけスキップし、他のNGワード判定は継続する */ }
+    } else {
+      matchers.push(body=>body.indexOf(raw)>=0);
+    }
+  });
+  return matchers;
+}
+function getNgWordMatchers(){
+  if(_ngWordMatchersCache===null) _ngWordMatchersCache = compileNgWordMatchers();
+  return _ngWordMatchersCache;
+}
+function isBodyNgMatched(body){
+  const matchers = getNgWordMatchers();
+  if(!matchers.length) return false;
+  const text = String(body||'');
+  for(let i=0;i<matchers.length;i++){
+    try{ if(matchers[i](text)) return true; }
+    catch(e){ /* 実行時エラーが出た場合もそのワードの判定だけ諦めて次に進む */ }
+  }
+  return false;
+}
+function ngAdd(id){
+  if(!persist.ngIds.includes(id)){ persist.ngIds.push(id); savePersist(); }
+  if(STATE.view==='res') renderRes($('#main'));
+  refreshOpenPopups();
+  toast(`${id} をNG登録しました`);
+}
+function ngRemove(id){
+  const i=persist.ngIds.indexOf(id);
+  if(i>=0){ persist.ngIds.splice(i,1); savePersist(); }
+  if(STATE.view==='res') renderRes($('#main'));
+  refreshOpenPopups();
+  toast(`${id} のNGを解除しました`);
+}
+
+/* ---------- theme ---------- */
+/* v3.6.0: 設定ドロワー内のバージョン表記がハードコードされたまま古いまま残ってしまう
+   バグの再発防止のため、VERSION定数から動的に描画する専用関数を用意し、起動時に一度呼ぶ。 */
+function syncVersionTexts(){
+  const verEl = $('#drawerVerText');
+  const noteEl = $('#drawerNoteText');
+  if(verEl) verEl.textContent = `v${VERSION}`;
+  if(noteEl) noteEl.textContent = `5ch ブラウザ v${VERSION}`;
+}
+function applyTheme(){
+  document.documentElement.setAttribute('data-theme', persist.theme);
+  const isDark = persist.theme==='dark';
+  const icon=$('#drawerThemeIcon'), label=$('#drawerThemeLabel'), item=$('#drawerThemeItem');
+  if(icon) icon.textContent = isDark ? '🌙' : '☀️';
+  if(label) label.textContent = isDark ? 'ダークモード' : 'ライトモード';
+  if(item) item.setAttribute('aria-label', isDark ? 'ライトモードに切替' : 'ダークモードに切替');
+}
+function toggleTheme(){
+  persist.theme = persist.theme==='dark' ? 'light' : 'dark';
+  applyTheme();
+  savePersist();
+}
+
+/* ---------- toast ---------- */
+let toastTimer=null;
+function toast(msg){
+  const t=$('#toast'); t.textContent=msg; t.classList.add('show');
+  clearTimeout(toastTimer); toastTimer=setTimeout(()=>t.classList.remove('show'),1900);
+}
+
+/* ---------- event delegation ---------- */
+document.addEventListener('click', e=>{
+  /* v4.0.0バグ修正: 多層ポップアップが右下にずれて重なっている際、はみ出している
+     背面（非アクティブ）のポップアップの要素をタップすると、裏側でイベントが反応して
+     別のポップアップの中身が書き換わったり暴発したりする「貫通クリック」バグがあった。
+     クリックされた要素が .popup 内のものであれば、それが popupStack の最後の要素
+     （＝現在最前面のポップアップ）と一致するかどうかを最優先で判定し、一致しない
+     （背面の古い）ポップアップへの操作はここで完全に無視・遮断する。 */
+  if(popupStack.length){
+    const clickedPopup = e.target.closest('.popup');
+    if(clickedPopup && clickedPopup !== popupStack[popupStack.length-1]){
+      e.stopPropagation();
+      e.preventDefault();
+      return;
+    }
+  }
+  const act=e.target.closest('[data-act]');
+  if(act){
+    const a=act.dataset.act;
+    if(a==='compose-open'){ $('#composeBar').classList.add('expanded'); $('#cBody').focus(); $('#fabNav')?.classList.add('fab-hide'); return; }
+    if(a==='compose-cancel'){
+      /* v2.4.0: Chmate準拠 - キャンセルは「フォームを閉じるだけ」。
+         入力中の文字は消さず、下書きも削除しない（下書きが消えるのは投稿完了時のみ）。 */
+      $('#composeBar').classList.remove('expanded'); $('#fabNav')?.classList.remove('fab-hide');
+      return;
+    }
+    if(a==='compose-post'){ postMessage(); return; }
+    if(a==='scroll-top'){ scrollThreadTop(); return; }
+    if(a==='scroll-bottom'){ scrollThreadBottom(); return; }
+    if(a==='new-arrival-jump'){ jumpToBottomFromNotice(); return; }
+    if(a==='thread-refresh'){ refreshThread(); return; }
+    if(a==='thread-retry'){ refreshThread(); return; }
+    if(a==='thread-sort'){ threadSortMode = nextThreadSortMode(threadSortMode); refreshThreadListView(); return; }
+    /* v3.8.0: 検索キーワードクリアボタンのハンドラ */
+    if(a==='thread-search-clear'){
+      threadFilterText = '';
+      const input = $('#threadSearchInput');
+      if(input){ input.value = ''; }
+      updateThreadSearchResults();
+      const clearBtn = $('#threadSearchClearBtn');
+      if(clearBtn) clearBtn.classList.remove('show');
+      if(input) input.focus();
+      return;
+    }
+    if(a==='fav-check-all'){ checkFavoritesNewArrivals(); return; }
+    if(a==='boards-refresh-all'){ refreshAllBoardsSubjectCounts(); return; }
+    if(a==='home-tab'){ setHomeTab(act.dataset.hometab); return; }
+    if(a==='gallery-open'){ openGalleryPopup(); return; }
+    if(a==='gallery-jump'){ jumpToPost(parseInt(act.dataset.num,10)); return; }
+    if(a==='popup-close'){ closeTopPopup(); return; }
+    if(a==='export'){ exportData(); return; }
+    if(a==='import'){ $('#importFile').click(); return; }
+    if(a==='theme-toggle'){ toggleTheme(); return; }
+    if(a==='data-clear-all'){ clearAllData(); return; }
+    if(a==='reset-read'){ resetRead(); return; }
+    if(a==='ng-manage'){ closeDrawer(); openNgManagePopup(); return; }
+    if(a==='ng-add'){ ngAdd(act.dataset.id); closeTopPopup(); return; }
+    if(a==='ng-remove-single'){ ngRemove(act.dataset.id); closeTopPopup(); return; }
+    /* v3.6.0: ngRemove()内で既にrefreshOpenPopups()が呼ばれるため、閉じて再度開き直す
+       必要はない（閉じ直すとタブ切替直後の見た目のチラつきの原因になっていた） */
+    if(a==='ng-remove-list'){ ngRemove(act.dataset.id); return; }
+    if(a==='ng-remove-word'){ ngRemoveWord(parseInt(act.dataset.idx,10)); return; }
+    if(a==='ng-tab-switch'){ switchNgManageTab(act.dataset.ngtab); return; }
+    if(a==='ng-manage-add'){ submitNgManageAdd(act.closest('.ng-manage-popup')); return; }
+    if(a==='customboard-manage-open'){ closeDrawer(); openCustomBoardManagePopup(); return; }
+    if(a==='customboard-add'){ submitCustomBoardAdd(act.closest('.ng-manage-popup')); return; }
+    if(a==='customboard-remove-confirm'){
+      /* v4.4.0: ホーム画面の板一覧行に直接ついているゴミ箱ボタン。
+         誤タップでの事故を防ぐため、既存のデータ全消去と同じくwindow.confirmで確認する */
+      const id = act.dataset.id;
+      const cb = (persist.customBoards||[]).find(x=>x.id===id);
+      const label = cb ? cb.name : id;
+      if(window.confirm(`「${label}」を削除しますか？`)){ removeCustomBoard(id); if(STATE.view==='boards') renderView(); }
+      return;
+    }
+    if(a==='customboard-remove'){
+      /* v4.4.0: カスタム板管理ポップアップ内の削除ボタン。ポップアップは閉じずに
+         リストだけ再描画する（NG管理のng-remove-listと同じ挙動方針） */
+      const id = act.dataset.id;
+      const cb = (persist.customBoards||[]).find(x=>x.id===id);
+      const label = cb ? cb.name : id;
+      if(window.confirm(`「${label}」を削除しますか？`)){
+        removeCustomBoard(id);
+        refreshOpenPopups();
+        if(STATE.view==='boards') renderView();
+      }
+      return;
+    }
+    if(a==='res-reply'){ closeResMenu(); openComposeForReply(parseInt(act.dataset.num,10)); return; }
+    if(a==='res-copy'){ closeResMenu(); copyPostBody(parseInt(act.dataset.num,10)); return; }
+    if(a==='res-ng'){
+      const id=act.dataset.id; closeResMenu();
+      if(persist.ngIds.includes(id)) ngRemove(id); else ngAdd(id);
+      return;
+    }
+    if(a==='thread-menu-fav'){ closeThreadMenu(); toggleThreadFavoriteFromMenu(STATE.threadId); return; }
+    if(a==='thread-menu-gallery'){ closeThreadMenu(); openGalleryPopup(); return; }
+    if(a==='thread-menu-resetread'){ closeThreadMenu(); resetReadForThread(STATE.threadId); return; }
+    if(a==='search-next-thread'){ toggleNextThreadCandidates(act.dataset.thread); return; }
+    if(a==='nushi-toggle'){
+      const tid = STATE.threadId;
+      if(!tid) return;
+      nushiOnlyByThread[tid] = !nushiOnlyByThread[tid];
+      /* v4.0.0: 未読レス数(newCount)や新着通知バッジの計算は常に全レス基準(posts.length)で
+         行われており、この抽出表示はあくまで見た目のフィルタなので、再描画するだけで
+         既読管理や新着通知の挙動には一切影響しない。 */
+      renderRes($('#main'));
+      toast(nushiOnlyByThread[tid] ? 'スレ主のみ表示 ON' : 'スレ主のみ表示 OFF');
+      return;
+    }
+    return;
+  }
+  /* v2.8.0: 次スレ候補リンクをタップしたら、そのスレへ直接遷移する */
+  const nextLink=e.target.closest('.next-thread-link');
+  if(nextLink){ navigate('res',{boardId:nextLink.dataset.board, threadId:nextLink.dataset.thread}); return; }
+  if(resMenuOpen && !e.target.closest('.res-menu')){ closeResMenu(); }
+  if(threadMenuOpen && !e.target.closest('.thread-menu') && e.target.id!=='threadMenuBtn'){ closeThreadMenu(); }
+  const pid=e.target.closest('.pid');
+  if(pid){ e.stopPropagation(); openIdPopup(pid.dataset.id); return; }
+  const phead=e.target.closest('.pnum, .post-head');
+  if(phead){
+    const postEl=phead.closest('.post');
+    if(postEl){ e.stopPropagation(); openResMenu(postEl, e.clientX, e.clientY); return; }
+  }
+  const thumb=e.target.closest('.post-thumb, .gallery-thumb');
+  if(thumb){
+    e.stopPropagation();
+    $('#imgLightboxImg').src = thumb.dataset.full;
+    $('#imgLightbox').classList.add('show');
+    return;
+  }
+  const anchor=e.target.closest('.anchor');
+  if(anchor){ openAnchorPopup(parseInt(anchor.dataset.res,10)); return; }
+  const rep=e.target.closest('.reply-badge');
+  if(rep){ openReplyPopup(parseInt(rep.dataset.replies,10)); return; }
+  const star=e.target.closest('.fav-star');
+  if(star){
+    e.stopPropagation();
+    const id=star.dataset.fav;
+    const i=persist.favorites.indexOf(id);
+    if(i>=0){ persist.favorites.splice(i,1); star.classList.remove('on'); star.textContent='☆'; }
+    else{ persist.favorites.push(id); star.classList.add('on'); star.textContent='★'; }
+    savePersist(); return;
+  }
+  const boardStar=e.target.closest('.board-fav-star');
+  if(boardStar){
+    e.stopPropagation();
+    const id=boardStar.dataset.favboard;
+    const i=persist.favBoards.indexOf(id);
+    if(i>=0) persist.favBoards.splice(i,1);
+    else persist.favBoards.push(id);
+    savePersist();
+    if(STATE.view==='boards') renderBoards($('#main'));
+    return;
+  }
+  const brow=e.target.closest('.board-row');
+  if(brow){ navigate('threads',{boardId:brow.dataset.board, threadId:null}); return; }
+  const trow=e.target.closest('.thread-row, .fav-row');
+  if(trow){ navigate('res',{boardId:trow.dataset.board, threadId:trow.dataset.thread}); return; }
+});
+
+$('#backBtn').addEventListener('click', goBack);
+$('#menuBtn').addEventListener('click', openDrawer);
+$('#threadMenuBtn').addEventListener('click', e=>{ e.stopPropagation(); openThreadMenu(e.currentTarget); });
+$('#imgLightbox').addEventListener('click', ()=>{ $('#imgLightbox').classList.remove('show'); $('#imgLightboxImg').src=''; });
+$('#scrim').addEventListener('click', ()=>{
+  if(popupStack.length){ closeTopPopup(); }
+  else { closeDrawer(); }
+});
+$('#main').addEventListener('scroll', ()=>{
+  if(resMenuOpen) closeResMenu();
+  if(threadMenuOpen) closeThreadMenu();
+  /* v3.5.0: スレッド閲覧中のスクロール位置をデバウンス保存（プチフリ防止のため毎フレーム保存はしない） */
+  scheduleScrollPosSave();
+  /* v3.7.0: 新着レス通知が表示中で、最下部付近までスクロールされたら自動的に消す。
+     通知バッジをタップした後のなめらかスクロール中も、このイベントで最下部到達を検知して
+     消えるため、専用の「スクロール完了検知」ロジックを別途持つ必要がない。
+     v3.9.0: ただし、スレ入場時の自動スクロール位置復元(isAutoScrolling)が進行中の間は、
+     たまたま最下部付近に復元されただけで無関係の新着通知を誤って消してしまわないよう、
+     この最下部検知そのものをスキップする。 */
+  if(!isAutoScrolling && newArrivalNoticeThreadId && STATE.view==='res' && STATE.threadId===newArrivalNoticeThreadId){
+    const m = $('#main');
+    if(m.scrollTop + m.clientHeight >= m.scrollHeight - 24) hideNewArrivalNotice();
+  }
+}, {passive:true});
+$('#importFile').addEventListener('change', e=>{ const f=e.target.files[0]; if(f) importData(f); e.target.value=''; });
+
+/* v2.10.0パフォーマンス改善: 下書き保存のデバウンス処理
+   1文字入力するたびに同期I/OのsavePersist()（localStorage.setItem）を実行するとプチフリの
+   原因になるため、persist（メモリ上のオブジェクト）は即時更新しつつ、実際のlocalStorageへの
+   書き込みは「入力が止まってから500ms後」にまとめて1回だけ行うようにする。 */
+let draftSaveTimer = null;
+function scheduleDraftSave(){
+  clearTimeout(draftSaveTimer);
+  draftSaveTimer = setTimeout(()=>{ savePersist(); draftSaveTimer = null; }, 500);
+}
+function flushDraftSave(){
+  if(draftSaveTimer){ clearTimeout(draftSaveTimer); draftSaveTimer = null; savePersist(); }
+}
+document.addEventListener('input', e=>{
+  if(e.target && e.target.id==='threadSearchInput'){
+    threadFilterText = e.target.value;
+    updateThreadSearchResults();
+    /* v3.8.0: 検索キーワード有無に応じてクリアボタンの表示/非表示を切り替える */
+    const clearBtn = $('#threadSearchClearBtn');
+    if(clearBtn) clearBtn.classList.toggle('show', threadFilterText.length > 0);
+    return;
+  }
+  /* v2.3.0: 書き込みフォームの下書きをリアルタイムに永続化
+     v2.10.0: localStorageへの書き込みはデバウンスして頻度を大幅に削減 */
+  if(e.target && (e.target.id==='cName' || e.target.id==='cBody')){
+    if(!STATE.threadId) return;
+    if(!persist.draft) persist.draft={};
+    persist.draft[STATE.threadId] = { name: $('#cName').value, body: $('#cBody').value };
+    scheduleDraftSave();
+  }
+});
+/* v3.6.0: NG管理ポップアップの入力欄でEnterキーを押したら「追加」と同じ動作にする（スマホでの入力確定を想定） */
+document.addEventListener('keydown', e=>{
+  if(e.target && e.target.id==='ngManageInput' && e.key==='Enter'){
+    e.preventDefault();
+    submitNgManageAdd(e.target.closest('.ng-manage-popup'));
+  }
+  /* v4.4.0: カスタム板追加フォーム（URL欄・表示名欄どちらでも）も同様にEnterで追加できるようにする */
+  if(e.target && (e.target.id==='customBoardUrlInput' || e.target.id==='customBoardNameInput') && e.key==='Enter'){
+    e.preventDefault();
+    submitCustomBoardAdd(e.target.closest('.ng-manage-popup'));
+  }
+});
+/* v2.10.0: アプリの切り替え・画面オフ・タブを閉じるなど、デバウンス待ち（最大500ms）の
+   間に離脱してしまうケースに備え、非表示化・離脱のタイミングで確実にフラッシュ保存する */
+document.addEventListener('visibilitychange', ()=>{ if(document.visibilityState==='hidden'){ flushDraftSave(); flushScrollPosSave(); } });
+window.addEventListener('pagehide', ()=>{ flushDraftSave(); flushScrollPosSave(); });
+window.addEventListener('beforeunload', ()=>{ flushDraftSave(); flushScrollPosSave(); });
+
+/* ---------- init ---------- */
+async function init(){
+  loadPersist();
+  /* v4.4.0: STATE構築やnormalizeState()（resolveLiveThread経由でOPEN2CH_BOARDSを
+     参照する）より前に、必ずカスタム板をBOARDS/OPEN2CH_BOARDSへ反映しておく。
+     ここが後だと、起動直後にカスタム板のスレッドを開こうとした際に板情報が
+     見つからずダミー扱いされてしまう。 */
+  applyCustomBoards();
+  /* v4.7.0バグ修正: 「お気に入りスレのタイトルが(読み込み中...)に化ける」問題の
+     対策本体。OPEN2CH_BOARDS にカスタム板のマッピングが反映済み（＝上の
+     applyCustomBoards()実行後）のこのタイミングで、persist.threadCacheの内容を
+     THREAD_INDEXへ確実に復元する。resolveLiveThread()を使ってTHREAD_INDEXに
+     まだ無い実データスレのプレースホルダを作ってからキャッシュを上書きするため、
+     起動直後でも一覧画面が正しいタイトル・レス数で描画される。 */
+  restoreThreadCacheIntoIndex();
+  STATE={view:persist.nav.view||'boards', boardId:persist.nav.boardId||null, threadId:persist.nav.threadId||null};
+  normalizeState();
+  /* v3.5.0: アプリを閉じる/切り替える直前にスレッド画面のままだった場合、
+     起動直後の再入場としてスクロール位置の復元対象に印を付ける */
+  if(STATE.view==='res' && STATE.threadId) pendingScrollRestore[STATE.threadId] = true;
+  /* v4.7.0: ensureShape()内でカスタム板IDの旧→新形式マイグレーションが実際に
+     発生していた場合、STATE確定直後のこのタイミングでsavePersist()を呼び、
+     クリーンアップ済みの状態をできるだけ早くlocalStorageへ書き戻す。
+     これにより、アプリを何も操作せず即座に閉じたとしても、旧ID形式の生データが
+     ストレージに残り続ける期間を最小化できる（savePersist()はSTATEを参照する
+     ため、STATE確定より前には呼べないことに注意）。 */
+  if(_customBoardIdMigrationOccurred){
+    _customBoardIdMigrationOccurred = false;
+    savePersist();
+  }
+  applyTheme();
+  syncVersionTexts();
+  history.replaceState(serialize(),'');
+  /* v2.3.0: 起動時も先に画面を描画し、通信完了後に中身を更新する */
+  renderView();
+  showLoading();
+  try{
+    await prepareViewData();
+  } finally {
+    hideLoading();
+  }
+  renderView();
+}
+init();
+</script>
+</body>
+</html>
